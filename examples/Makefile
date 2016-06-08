@@ -2,7 +2,10 @@ include ../make_config.mk
 
 .PHONY: clean librocksdb
 
-all: simple_example column_families_example compact_files_example c_simple_example optimistic_transaction_example transaction_example
+all: fptreedb_example simple_example column_families_example compact_files_example c_simple_example optimistic_transaction_example transaction_example
+
+fptreedb_example: librocksdb fptreedb_example.cc
+	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../librocksdb.a -I../include -O2 -std=c++11 $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
 
 simple_example: librocksdb simple_example.cc
 	$(CXX) $(CXXFLAGS) $@.cc -o$@ ../librocksdb.a -I../include -O2 -std=c++11 $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)

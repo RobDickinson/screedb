@@ -5,7 +5,9 @@ Fingerprinted Persistent Trees for RocksDB
 
 Start with Ubuntu 16.04 (either desktop or server distribution)
 
-Install RocksDB required libraries: https://github.com/facebook/rocksdb/blob/master/INSTALL.md#supported-platforms
+Install RocksDB required libraries: 
+
+* https://github.com/facebook/rocksdb/blob/master/INSTALL.md#supported-platforms
 
 Get the sources:
 

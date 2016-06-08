@@ -56,10 +56,6 @@ make clean                  # clean up afterwards
 
 ## Configuring CLion Project
 
-Delete original CMakeLists.txt file (it's for Windows build).
-
-Add CMakeLists.txt to .gitignore, since CLion will overwrite this at will.
-
 For Toolchain configuration, use bundled CMake.
 
 Use wizard to create project:

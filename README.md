@@ -32,8 +32,8 @@ pushd . > /dev/null
 cd $FPTREEDB_HOME
 make static_lib -j8
 cd examples
-make fptree_example
-./fptree_example
+make fptreedb_example
+./fptreedb_example
 popd > /dev/null
 ```
 
@@ -56,13 +56,17 @@ make clean                  # clean up afterwards
 
 ## Configuring CLion Project
 
-For Toolchain configuration, use bundled CMake
+Delete original CMakeLists.txt file (it's for Windows build).
+
+Add CMakeLists.txt to .gitignore, since CLion will overwrite this at will.
+
+For Toolchain configuration, use bundled CMake.
 
 Use wizard to create project:
 
 * From Welcome screen, select "Import Project From Sources"
 * select FPTREEDB_HOME directory
-* select "Overwrite CMakeLists.txt" (official version is for Windows)
+* select "Overwrite CMakeLists.txt"
 * deselect all directories, then select db
 
 Add these lines to CMakeLists.txt:
@@ -73,11 +77,12 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_SOURCE_DIR}/third-party/gtest-1.7.0/fused-src)
 ```
 
-In Project View, right-click on db|examples|memtable|table|util|utilities directories and select Mark Directory As | Project Sources and Headers. Close CLion, and verify that .idea/fptreedb.iml now looks like this:
+In Project View, right-click on db|examples|include|memtable|table|util|utilities directories and select Mark Directory As | Project Sources and Headers. Close CLion, and verify that .idea/fptreedb.iml now looks like this:
 
 ```
 <content url="file://$MODULE_DIR$">
   <sourceFolder url="file://$MODULE_DIR$/CMakeLists.txt" isTestSource="false" />
+  <sourceFolder url="file://$MODULE_DIR$/src.mk" isTestSource="false" />
   <sourceFolder url="file://$MODULE_DIR$/db" isTestSource="false" />
   <sourceFolder url="file://$MODULE_DIR$/examples" isTestSource="false" />
   <sourceFolder url="file://$MODULE_DIR$/include" isTestSource="false" />

@@ -37,7 +37,7 @@
 #include <vector>
 #include "rocksdb/db.h"
 
-#define NOPE Status::NotSupported()
+#define NOOPE override { return Status::NotSupported(); }
 
 // Database backed by Intel NVML and "Fingerprinted Persistent Tree" implementation.
 // See examples/fptree_example.cc for usage.
@@ -125,7 +125,7 @@ namespace rocksdb {
     // with Deletes and Merges can result in undefined behavior.
     using DB::SingleDelete;
     virtual Status SingleDelete(const WriteOptions& options, ColumnFamilyHandle* column_family,
-                                const Slice& key) { return NOPE; }
+                                const Slice& key) NOOPE;
 
     // Apply the specified updates to the database. If `updates` contains no update, WAL will
     // still be synced if options.sync=true. Returns OK on success, non-OK on failure.
@@ -142,16 +142,16 @@ namespace rocksdb {
     // should be deleted before this db is deleted.
     using DB::NewIterator;
     virtual Iterator* NewIterator(const ReadOptions& options,
-                                  ColumnFamilyHandle* column_family) { return nullptr; }
+                                  ColumnFamilyHandle* column_family) override { return nullptr; }
 
     // Returns iterators from a consistent database state across multiple column families.
     // Iterators are heap allocated and need to be deleted before the db is deleted.
     virtual Status NewIterators(const ReadOptions& options,
                                 const std::vector<ColumnFamilyHandle*>& column_families,
-                                std::vector<Iterator*>* iterators) { return NOPE; }
+                                std::vector<Iterator*>* iterators) NOOPE;
 
     // Returns the sequence number of the most recent transaction.
-    virtual SequenceNumber GetLatestSequenceNumber() const { return 0; }
+    virtual SequenceNumber GetLatestSequenceNumber() const override { return 0; }
 
     // Sets iter to an iterator that is positioned at a write-batch containing seq_number.
     // If the sequence number is non existent, it returns an iterator at the first available
@@ -162,9 +162,7 @@ namespace rocksdb {
     virtual Status GetUpdatesSince(SequenceNumber seq_number,
                                    unique_ptr<TransactionLogIterator>* iter,
                                    const TransactionLogIterator::ReadOptions&
-                                   read_options = TransactionLogIterator::ReadOptions()) {
-      return NOPE;
-    }
+                                   read_options = TransactionLogIterator::ReadOptions()) NOOPE;
 
     // =============================================================================================
     // SNAPSHOT METHODS
@@ -174,10 +172,10 @@ namespace rocksdb {
     // observe a stable snapshot of the current DB state.  The caller must call
     // ReleaseSnapshot(result) when the snapshot is no longer needed.
     // nullptr will be returned if the DB fails to take a snapshot or does not support snapshot.
-    virtual const Snapshot* GetSnapshot() { return nullptr; }
+    virtual const Snapshot* GetSnapshot() override { return nullptr; }
 
     // Release a previously acquired snapshot.  The caller must not use snapshot after this call.
-    virtual void ReleaseSnapshot(const Snapshot* snapshot) { }
+    virtual void ReleaseSnapshot(const Snapshot* snapshot) override { }
 
     // =============================================================================================
     // COLUMN FAMILY METHODS
@@ -186,21 +184,21 @@ namespace rocksdb {
     // Create a column_family and return the handle of column family through the argument handle.
     virtual Status CreateColumnFamily(const ColumnFamilyOptions& options,
                                       const std::string& column_family_name,
-                                      ColumnFamilyHandle** handle) { return NOPE; }
+                                      ColumnFamilyHandle** handle) NOOPE;
 
     // Returns default column family.
-    virtual ColumnFamilyHandle* DefaultColumnFamily() const { return nullptr; }
+    virtual ColumnFamilyHandle* DefaultColumnFamily() const override { return nullptr; }
 
     // Drop a column family specified by column_family handle. This call only records a drop
     // record in the manifest and prevents the column family from flushing and compacting.
-    virtual Status DropColumnFamily(ColumnFamilyHandle* column_family) { return NOPE; }
+    virtual Status DropColumnFamily(ColumnFamilyHandle* column_family) NOOPE;
 
     // Obtains the meta data of the specified column family of the DB. Status::NotFound() will be
     // returned if the current DB does not have any column family match the specified name.
     // If cf_name is not specified, then the metadata of the default column family will be returned.
     using DB::GetColumnFamilyMetaData;
     virtual void GetColumnFamilyMetaData(ColumnFamilyHandle* column_family,
-                                         ColumnFamilyMetaData* metadata) { }
+                                         ColumnFamilyMetaData* metadata) override { }
 
     // =============================================================================================
     // PROPERTY METHODS
@@ -208,7 +206,8 @@ namespace rocksdb {
 
     // Like GetIntProperty(), but returns the aggregated int property from all column families.
     using DB::GetAggregatedIntProperty;
-    virtual bool GetAggregatedIntProperty(const Slice& property, uint64_t* value) { return false; }
+    virtual bool GetAggregatedIntProperty(const Slice& property,
+                                          uint64_t* value) override { return false; }
 
     // Like GetProperty(), but only works for a subset of properties whose return value is an
     // integer. Return the value by integer. Supported properties:
@@ -238,7 +237,7 @@ namespace rocksdb {
     //  "rocksdb.num-running-flushes"
     using DB::GetIntProperty;
     virtual bool GetIntProperty(ColumnFamilyHandle* column_family, const Slice& property,
-                                uint64_t* value) { return false; }
+                                uint64_t* value) override { return false; }
 
     // DB implementations can export properties about their state via this method. If "property"
     // is a valid property understood by this DB implementation (see Properties struct above
@@ -246,7 +245,7 @@ namespace rocksdb {
     // Otherwise, returns false.
     using DB::GetProperty;
     virtual bool GetProperty(ColumnFamilyHandle* column_family,
-                             const Slice& property, std::string* value) { return false; }
+                             const Slice& property, std::string* value) override { return false; }
 
     // =============================================================================================
     // CONFIGURATION METHODS
@@ -254,7 +253,7 @@ namespace rocksdb {
 
     // Prevent file deletions. Compactions will continue to occur, but no obsolete files will be
     // deleted. Calling this multiple times have the same effect as calling it once.
-    virtual Status DisableFileDeletions() { return NOPE; }
+    virtual Status DisableFileDeletions() NOOPE;
 
     // Enable automatic compactions for the given column families if they were
     // previously disabled. The function will first set the disable_auto_compactions option for
@@ -262,9 +261,7 @@ namespace rocksdb {
     // NOTE: Setting disable_auto_compactions to 'false' through SetOptions() API
     // does NOT schedule a flush/compaction afterwards, and only changes the
     // parameter itself within the column family option.
-    virtual Status EnableAutoCompaction(const std::vector<ColumnFamilyHandle*>& handles) {
-      return NOPE;
-    }
+    virtual Status EnableAutoCompaction(const std::vector<ColumnFamilyHandle*>& handles) NOOPE;
 
     // Allow compactions to delete obsolete files.
     // If force == true, the call to EnableFileDeletions() will guarantee that file deletions are
@@ -273,45 +270,45 @@ namespace rocksdb {
     // called at least as many times as DisableFileDeletions(), enabling the two methods to be
     // called by two threads concurrently without synchronization -- i.e., file deletions will
     // be enabled only after both threads call EnableFileDeletions().
-    virtual Status EnableFileDeletions(bool force) { return NOPE; }
+    virtual Status EnableFileDeletions(bool force) NOOPE;
 
     // Sets the globally unique ID created at database creation time by invoking
     // Env::GenerateUniqueId(), in identity. Returns Status::OK if identity could be set properly.
-    virtual Status GetDbIdentity(std::string& identity) const { return NOPE; }
+    virtual Status GetDbIdentity(std::string& identity) const NOOPE;
 
     // Get Env object from the DB
-    virtual Env* GetEnv() const { return nullptr; }
+    virtual Env* GetEnv() const override { return nullptr; }
 
     // Get DB name -- the exact same name that was provided as an argument to DB::Open().
-    virtual const std::string& GetName() const { return dbname_; }
+    virtual const std::string& GetName() const override { return dbname_; }
 
     // Get options in use.  During the process of opening the column family, the options
     // provided when calling DB::Open() or DB::CreateColumnFamily() will have been "sanitized"
     // and transformed in an implementation-defined manner.
     using DB::GetOptions;
-    virtual const Options& GetOptions(ColumnFamilyHandle* column_family) const {
+    virtual const Options& GetOptions(ColumnFamilyHandle* column_family) const override {
       const Options* options = new Options();
       return *options;
     }
     using DB::GetDBOptions;
-    virtual const DBOptions& GetDBOptions() const { return dboptions_; }
+    virtual const DBOptions& GetDBOptions() const override { return dboptions_; }
 
     // Number of files in level-0 that would stop writes.
     using DB::Level0StopWriteTrigger;
-    virtual int Level0StopWriteTrigger(ColumnFamilyHandle* column_family) { return 0; }
+    virtual int Level0StopWriteTrigger(ColumnFamilyHandle* column_family) override { return 0; }
 
     // Maximum level to which a new compacted memtable is pushed if it does not create overlap.
     using DB::MaxMemCompactionLevel;
-    virtual int MaxMemCompactionLevel(ColumnFamilyHandle* column_family) { return 0; }
+    virtual int MaxMemCompactionLevel(ColumnFamilyHandle* column_family) override { return 0; }
 
     // Number of levels used for this DB.
     using DB::NumberLevels;
-    virtual int NumberLevels(ColumnFamilyHandle* column_family) { return 0; }
+    virtual int NumberLevels(ColumnFamilyHandle* column_family) override { return 0; }
 
     // Sets options in use by parsing string map provided.
     using DB::SetOptions;
     virtual Status SetOptions(ColumnFamilyHandle*,
-                              const std::unordered_map<std::string, std::string>&) { return NOPE; }
+                              const std::unordered_map<std::string, std::string>&) NOOPE;
 
     // =============================================================================================
     // STORAGE BACKEND METHODS
@@ -325,9 +322,9 @@ namespace rocksdb {
     // (3) No snapshots are held.
     using DB::AddFile;
     virtual Status AddFile(ColumnFamilyHandle* column_family, const ExternalSstFileInfo* file_info,
-                           bool move_file) { return NOPE; }
+                           bool move_file) NOOPE;
     virtual Status AddFile(ColumnFamilyHandle* column_family,
-                           const std::string& file_path, bool move_file) { return NOPE; }
+                           const std::string& file_path, bool move_file) NOOPE;
 
     // CompactFiles() inputs a list of files specified by file numbers and compacts them to the
     // specified level. Note that the behavior is different from CompactRange() in that this
@@ -337,7 +334,7 @@ namespace rocksdb {
                                 ColumnFamilyHandle* column_family,
                                 const std::vector<std::string>& input_file_names,
                                 const int output_level,
-                                const int output_path_id = -1) { return NOPE; }
+                                const int output_path_id = -1) NOOPE;
 
     // Compact the underlying storage for the key range [*begin,*end]. The actual compaction
     // interval might be superset of [*begin, *end]. In particular, deleted and overwritten
@@ -358,17 +355,16 @@ namespace rocksdb {
     using DB::CompactRange;
     virtual Status CompactRange(const CompactRangeOptions& options,
                                 ColumnFamilyHandle* column_family,
-                                const Slice* begin, const Slice* end) { return NOPE; }
+                                const Slice* begin, const Slice* end) NOOPE;
 
     // Delete the file name from the db directory and update the internal state to reflect that.
     // Supports deletion of sst and log files only. 'name' must be path relative to the db
     // directory. eg. 000001.sst, /archive/000003.log
-    virtual Status DeleteFile(std::string name) { return NOPE; }
+    virtual Status DeleteFile(std::string name) NOOPE;
 
     // Flush all mem-table data.
     using DB::Flush;
-    virtual Status Flush(const FlushOptions& options,
-                         ColumnFamilyHandle* column_family) { return NOPE; }
+    virtual Status Flush(const FlushOptions& options, ColumnFamilyHandle* column_family) NOOPE;
 
     // For each i in [0,n-1], store in "sizes[i]", the approximate file system space used by
     // keys in "[range[i].start .. range[i].limit)". Note that the returned sizes measure file
@@ -379,7 +375,7 @@ namespace rocksdb {
     using DB::GetApproximateSizes;
     virtual void GetApproximateSizes(ColumnFamilyHandle* column_family,
                                      const Range* range, int n, uint64_t* sizes,
-                                     bool include_memtable = false) { }
+                                     bool include_memtable = false) override { }
 
     // Retrieve the list of all files in the database. The files are relative to the dbname and
     // are not absolute paths. The valid size of the manifest file is returned in
@@ -392,31 +388,31 @@ namespace rocksdb {
     // compensate for new data that arrived to already-flushed column families while other
     // column families were flushing.
     virtual Status GetLiveFiles(std::vector<std::string>&, uint64_t* manifest_file_size,
-                                bool flush_memtable = true) { return NOPE; }
+                                bool flush_memtable = true) NOOPE;
 
     // Returns a list of all table files with their level, start key and end key.
-    virtual void GetLiveFilesMetaData(std::vector<LiveFileMetaData>*) { }
+    virtual void GetLiveFilesMetaData(std::vector<LiveFileMetaData>*) override { }
 
     // Returns generic properties for tables in use.
     using DB::GetPropertiesOfAllTables;
     virtual Status GetPropertiesOfAllTables(ColumnFamilyHandle* column_family,
-                                            TablePropertiesCollection* props) { return NOPE; }
+                                            TablePropertiesCollection* props) NOOPE;
     virtual Status GetPropertiesOfTablesInRange(ColumnFamilyHandle* column_family,
                                                 const Range* range, std::size_t n,
-                                                TablePropertiesCollection* props) { return NOPE; }
+                                                TablePropertiesCollection* props) NOOPE;
 
     // Retrieve the sorted list of all wal files with earliest file first.
-    virtual Status GetSortedWalFiles(VectorLogPtr& files) { return NOPE; }
+    virtual Status GetSortedWalFiles(VectorLogPtr& files) NOOPE;
 
     // This function will wait until all currently running background processes finish. After it
     // returns, no background process will be run until UnblockBackgroundWork is called.
-    virtual Status PauseBackgroundWork() { return NOPE; }
-    virtual Status ContinueBackgroundWork() { return NOPE; }
+    virtual Status PauseBackgroundWork() NOOPE;
+    virtual Status ContinueBackgroundWork() NOOPE;
 
     // Sync the wal. Note that Write() followed by SyncWAL() is not exactly the same as Write()
     // with sync=true: in the latter case the changes won't be visible until the sync is done.
     // Currently only works if allow_mmap_writes = false in Options.
-    virtual Status SyncWAL() { return NOPE; }
+    virtual Status SyncWAL() NOOPE;
 
   protected:
     // Hide constructor, call Open() to create instead

@@ -3,7 +3,7 @@ Fingerprinted Persistent Trees for RocksDB
 
 ## Getting Started
 
-Start with Ubuntu 16.04 (either desktop or server distribution)
+Start with Ubuntu 16.04 (either desktop or server distribution) or OSX. Windows is not being tested at this time.
 
 Install RocksDB required libraries: 
 

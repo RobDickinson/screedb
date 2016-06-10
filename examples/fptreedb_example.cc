@@ -31,7 +31,7 @@
  */
 
 #include <iostream>
-#include "rocksdb/db.h"
+#include <libpmem.h>
 #include "rocksdb/utilities/fptreedb.h"
 
 using namespace rocksdb;
@@ -39,7 +39,24 @@ using namespace rocksdb;
 std::string kDBPath = "/tmp/fptreedb_example";
 
 int main() {
-  std::cout << "!!!!!!!!!! fptreedb_example starting\n";
+  std::cout << "[fptreedb_example] Starting\n";
+
+  // create a pmem file and memory map it
+  std::cout << "[fptreedb_example] Opening pmem file\n";
+  void* pmemaddr;
+  size_t mapped_len;
+  int is_pmem;
+  if ((pmemaddr = pmem_map_file("/tmp/some_pmem_file", 4096, PMEM_FILE_CREATE,
+                                0666, &mapped_len, &is_pmem)) == NULL) {
+    perror("pmem_map_file");
+    exit(1);
+  }
+  std::cout << "[fptreedb_example] Opened pmem file, is_pmem=" << is_pmem << "\n";
+
+  // close pmem file
+  std::cout << "[fptreedb_example] Closing pmem file\n";
+  pmem_unmap(pmemaddr, mapped_len);
+  std::cout << "[fptreedb_example] Closed pmem file, is_pmem=" << is_pmem << "\n";
 
   FPTreeDB* db;
   Options options;
@@ -80,6 +97,6 @@ int main() {
   // safely close DB
   delete db;
 
-  std::cout << "!!!!!!!!!! fptreedb_example finished successfully\n";
+  std::cout << "[fptreedb_example] Finished successfully\n";
   return 0;
 }

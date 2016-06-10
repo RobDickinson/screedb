@@ -13,7 +13,6 @@ Contents
 <li><a href="#building_and_running_tests">Building and Running Tests</a></li>
 <li><a href="#configuring_clion_project">Configuring CLion Project</a></li>
 <li><a href="#extending_rocksdb">Extending RocksDB</a></li>
-<li><a href="#integrating_nvml">Integrating NVML</a></li>
 </ul>
 
 <a name="getting_started"/>
@@ -26,6 +25,13 @@ Start with Ubuntu 16.04 (either desktop or server distribution) or other 64-bit 
 Install RocksDB required libraries:
 
 -	https://github.com/facebook/rocksdb/blob/master/INSTALL.md#supported-platforms
+
+Install Intel NVML:
+
+```
+git clone https://github.com/pmem/nvml.git
+make install
+```
 
 Get the sources:
 
@@ -102,7 +108,7 @@ include_directories(${PROJECT_SOURCE_DIR}/third-party/gtest-1.7.0/fused-src)
 
 In Project View, right-click on db|examples|include|memtable|table|util|utilities directories and select Mark Directory As | Project Sources and Headers. Wait for CLion to finish indexing, and you're good to go!
 
-The .gitignore for this project ignores CMakeLists.txt as well as the entire .idea directory, so no CLion-specific files should ever be committed.
+The .gitignore for this project ignores CMakeLists.txt and the entire .idea directory.
 
 <a name="extending_rocksdb"/>
 
@@ -115,21 +121,14 @@ We don't intend to change the core RocksDB distribution, but only to add code at
 
 For this prototype we're intending to bypass the LSM algorithm entirely. FPTreeDB takes inspiration from existing SpatialDB and TransactionDB utilities, which provide top-level wrappers around the RocksDB API. (Other RocksDB research targets alternate memtable/table classes within the structure of the LSM algorithm, but that is expressly not the intent here.)
 
-Prototype files added:
+New files added:
 
--	include/rocksdb/utilities/fptreedb.h (declares FPTreeDB, extending DB)
--	utilities/fptreedb/fptreedb.cc (for FPTreeDB method implementations)
--	examples/fptreedb_example.cc (test program adapted from simple_example.cc)
+-	include/rocksdb/utilities/fptreedb.h (declares FPTreeDB class)
+-	utilities/fptreedb/fptreedb.cc (FPTreeDB class implementation)
+-	examples/fptreedb_example.cc (test program adapted from simple_example)
 
-Build files modified:
+Existing files modified:
 
--	src.mk (to include utilities/fptreedb/fptreedb.cc in static library build)
--	examples/.gitignore (to ignore fptreedb_example binary)
--	examples/Makefile (to build fptreedb_example.cc)
-
-<a name="integrating_nvml"/>
-
-Integrating NVML
-----------------
-
-(coming next!)
+-	src.mk (to include fptreedb in static library)
+-	examples/.gitignore (to ignore fptreedb_example)
+-	examples/Makefile (to build fptreedb_example)

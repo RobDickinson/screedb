@@ -58,6 +58,7 @@ vi ~/fptreedb-test.sh, add:
 
 ```
 #!/bin/bash -e
+rm -rf /tmp/fptreedb_example
 pushd . > /dev/null
 cd $FPTREEDB_HOME
 make static_lib -j8

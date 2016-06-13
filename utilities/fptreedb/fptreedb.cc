@@ -56,15 +56,21 @@ namespace rocksdb {
   // Default constructor.
   FPTreeDB::FPTreeDB(const Options& options, const FPTreeDBOptions& dboptions,
                      const std::string& dbname) : dbname_(dbname) {
+    // todo not honoring options.create_if_missing (fails if file already exists)
+    // todo what if user doesn't have access to file/path?
     std::cout << "[FPTreeDB] Initializing using default constructor, name=" << GetName() << "\n";
-    // todo: perform initialization
+    if ((pmem_pool_ = pmemobj_create(GetName().c_str(), POBJ_LAYOUT_NAME(FPTreeDB),
+                                     PMEMOBJ_MIN_POOL, 0666)) == NULL) {
+      perror("pmemobj_create");
+      exit(1);
+    }
     std::cout << "[FPTreeDB] Initialized ok, name=" << GetName() << "\n";
   }
 
   // Safely close the database.
   FPTreeDB::~FPTreeDB() {
     std::cout << "[FPTreeDB] Closing database, name=" << GetName() << "\n";
-    // todo: shut down safely
+    pmemobj_close(pmem_pool_);
     std::cout << "[FPTreeDB] Closed ok, name=" << GetName() << "\n";
   }
 

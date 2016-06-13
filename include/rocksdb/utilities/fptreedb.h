@@ -35,6 +35,7 @@
 
 #include <string>
 #include <vector>
+#include <libpmemobj.h>
 #include "rocksdb/db.h"
 
 #define NOOPE override { return Status::NotSupported(); }
@@ -421,6 +422,9 @@ namespace rocksdb {
     // Configuration fields
     const std::string dbname_;
     const DBOptions dboptions_;
+
+    // Persistent memory fields
+    PMEMobjpool* pmem_pool_;
 
   private:
     FPTreeDB(const FPTreeDB&);        // Prevent copying

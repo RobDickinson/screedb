@@ -29,13 +29,16 @@ Install RocksDB required libraries:
 Install Intel NVML:
 
 ```
+cd ~
 git clone https://github.com/pmem/nvml.git
-make install
+cd nvml
+sudo make install -j8
 ```
 
 Get the sources:
 
 ```
+cd ~
 git clone https://github.com/RobDickinson/fptreedb.git
 ```
 
@@ -67,6 +70,7 @@ popd > /dev/null
 To run tests:
 
 ```
+chmod +x ~/fptreedb*
 source ~/fptreedb-env.sh
 ~/fptreedb-test.sh
 ```

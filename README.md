@@ -1,4 +1,4 @@
-fptreedb
+FPTreeDB
 ========
 
 **Fingerprinted Persistent Trees for RocksDB**
@@ -34,7 +34,7 @@ New files added:
 
 Existing files modified:
 
--	src.mk (to include fptreedb in static library)
+-	src.mk (to include FPTreeDB in static library)
 -	examples/.gitignore (to ignore fptreedb_example)
 -	examples/Makefile (to build fptreedb_example)
 
@@ -115,7 +115,7 @@ make clean                  # clean up afterwards
 Configuring CLion Project
 -------------------------
 
-Obviously the use of an IDE is a personal preference -- CLion is not required for fptreedb development (it's not free), but it's very easy to configure if you have a valid license.
+Obviously the use of an IDE is a personal preference -- CLion is not required for FPTreeDB development (it's not free), but it's very easy to configure if you have a valid license.
 
 If prompted for Toolchain configuration, choose bundled CMake.
 

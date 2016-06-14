@@ -5,7 +5,7 @@ FPTreeDB
 
 FPTreeDB is a RocksDB utility whose name and design is inspired by the paper "FPTree: A Hybrid SCM-DRAM Persistent and Concurrent B-Tree for Storage Class Memory."
 
-FPTreeDB bypasses the RocksDB LSM implementation entirely, as opposed to adding or optimizing memtable/table types within the existing LSM implementation. FPTreeDB uses the AppDirect programming model (specifically NVML's libpmemobj library) to also bypass the Linux page cache and filesystem, which are known to incur significant overhead for RocksDB workloads.
+FPTreeDB bypasses the RocksDB LSM implementation entirely, as opposed to adding or optimizing memtable/table types within the existing LSM implementation. FPTreeDB uses Intel's NVM library (libpmemobj) to also bypass the Linux page cache and filesystem, which are known to incur significant overhead for RocksDB workloads.
 
 As a utility, FPTreeDB does not modify the core RocksDB distribution, but only adds code at expected extension points. The structure of these extensions for FPTreeDB takes inspiration from existing SpatialDB and TransactionDB utilities, which provide high-level wrappers using the RocksDB API.
 

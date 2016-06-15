@@ -40,7 +40,7 @@
 
 #define NOOPE override { return Status::NotSupported(); }
 
-// Database backed by Intel NVML and "Fingerprinted Persistent Tree" implementation.
+// Database backed by Intel NVML and "Fingerprinting Persistent Tree" implementation.
 // See examples/fptree_example.cc for usage.
 
 namespace rocksdb {

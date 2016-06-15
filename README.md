@@ -1,7 +1,7 @@
 FPTreeDB
 ========
 
-**Fingerprinted Persistent Trees for RocksDB**
+**Fingerprinting Persistent Trees for RocksDB**
 
 FPTreeDB is a RocksDB utility whose name and design is inspired by the paper "FPTree: A Hybrid SCM-DRAM Persistent and Concurrent B-Tree for Storage Class Memory."
 

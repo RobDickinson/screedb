@@ -17,6 +17,7 @@ Contents
 <li><a href="#installation">Installation</a></li>
 <li><a href="#building_and_running_tests">Building and Running Tests</a></li>
 <li><a href="#configuring_clion_project">Configuring CLion Project</a></li>
+<li><a href="#related_work">Related Work</a></li>
 </ul>
 
 <a name="project_structure"/>
@@ -137,3 +138,14 @@ include_directories(${PROJECT_SOURCE_DIR}/third-party/gtest-1.7.0/fused-src)
 In Project View, right-click on db|examples|include|memtable|table|util|utilities directories and select Mark Directory As | Project Sources and Headers. Wait for CLion to finish indexing, and you're good to go!
 
 The .gitignore for this project ignores CMakeLists.txt and the entire .idea directory.
+
+<a name="related_work"/>
+
+Related Work
+------------
+
+RocksDB fork for KV/NVM pathfinding:
+
+-	Gerrit server at http://az-sg-sw01.ch.intel.com/gerrit
+	-	**Warning!** HTTP proxy must be disabled on Linux to connect to gerrit web UI
+-	git clone -b dev/kv_pathfinding ssh://az-sg-sw01.ch.intel.com:29418/rocksdb rocksdb.kv

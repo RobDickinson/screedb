@@ -37,6 +37,7 @@
 #endif
 
 #include <iostream>
+#include <unistd.h>
 #include "rocksdb/utilities/fptreedb.h"
 
 #define NOPE Status::NotSupported()
@@ -56,13 +57,22 @@ namespace rocksdb {
   // Default constructor.
   FPTreeDB::FPTreeDB(const Options& options, const FPTreeDBOptions& dboptions,
                      const std::string& dbname) : dbname_(dbname) {
-    // todo not honoring options.create_if_missing (fails if file already exists)
-    // todo what if user doesn't have access to file/path?
     std::cout << "[FPTreeDB] Initializing using default constructor, name=" << GetName() << "\n";
-    if ((pmem_pool_ = pmemobj_create(GetName().c_str(), POBJ_LAYOUT_NAME(FPTreeDB),
-                                     PMEMOBJ_MIN_POOL, 0666)) == NULL) {
-      perror("pmemobj_create");
-      exit(1);
+    if (access(GetNamePtr(), F_OK) != 0) {
+      std::cout << "[FPTreeDB] Creating new file, name=" << GetName() << "\n";
+      if ((pmem_pool_ = pmemobj_create(GetNamePtr(), POBJ_LAYOUT_NAME(FPTreeDB),
+                                       PMEMOBJ_MIN_POOL, 0666)) == NULL) {
+        perror("pmemobj_create");
+        exit(1);
+      }
+      std::cout << "[FPTreeDB] Created new file, name=" << GetName() << "\n";
+    } else {
+      std::cout << "[FPTreeDB] Opening existing file, name=" << GetName() << "\n";
+      if ((pmem_pool_ = pmemobj_open(GetNamePtr(), POBJ_LAYOUT_NAME(FPTreeDB))) == NULL) {
+        perror("pmemobj_open");
+        exit(1);
+      }
+      std::cout << "[FPTreeDB] Opened existing file, name=" << GetName() << "\n";
     }
     std::cout << "[FPTreeDB] Initialized ok, name=" << GetName() << "\n";
   }

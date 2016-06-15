@@ -283,6 +283,9 @@ namespace rocksdb {
     // Get DB name -- the exact same name that was provided as an argument to DB::Open().
     virtual const std::string& GetName() const override { return dbname_; }
 
+    // Return pointer to DB name -- same name that was provided as an argument to DB::Open().
+    virtual const char* GetNamePtr() const { return dbname_.c_str(); }
+
     // Get options in use.  During the process of opening the column family, the options
     // provided when calling DB::Open() or DB::CreateColumnFamily() will have been "sanitized"
     // and transformed in an implementation-defined manner.

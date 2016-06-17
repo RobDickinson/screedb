@@ -33,22 +33,26 @@
 #include <iostream>
 #include "rocksdb/utilities/fptreedb.h"
 
+#define LOG(msg) std::cout << "[fptreedb_example] " << msg << "\n"
+
 using namespace rocksdb;
 
 std::string kDBPath = "/tmp/fptreedb_example";
 
 int main() {
-  std::cout << "[fptreedb_example] Starting\n";
+  LOG("Starting");
 
-  FPTreeDB* db;
+  // set DB options
   Options options;
   options.create_if_missing = true;
   FPTreeDBOptions fptree_options;
 
   // open DB
+  FPTreeDB* db;
   Status s = FPTreeDB::Open(options, fptree_options, kDBPath, &db);
   assert(s.ok());
   assert(db->GetName() == kDBPath);
+  LOG("Database is ready for use");
 
   // put key-value
   s = db->Put(WriteOptions(), "key1", "value");
@@ -79,6 +83,6 @@ int main() {
   // safely close DB
   delete db;
 
-  std::cout << "[fptreedb_example] Finished successfully\n";
+  LOG("Finished successfully");
   return 0;
 }

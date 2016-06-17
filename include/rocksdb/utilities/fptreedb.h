@@ -40,7 +40,7 @@
 
 #define NOOPE override { return Status::NotSupported(); }
 
-// Database backed by Intel NVML and "Fingerprinting Persistent Tree" implementation.
+// Database backed by NVML and "Fingerprinting Persistent Tree" implementation.
 // See examples/fptree_example.cc for usage.
 
 namespace rocksdb {
@@ -84,14 +84,14 @@ namespace rocksdb {
     using DB::KeyMayExist;
     virtual bool KeyMayExist(const ReadOptions& options, ColumnFamilyHandle* column_family,
                              const Slice& key, std::string* value,
-                             bool* value_found = nullptr) override;
+                             bool* value_found = nullptr) override { return true; }
 
     // Merge the database entry for "key" with "value".  Returns OK on success, and a non-OK
     // status on error. The semantics of this operation is determined by the user provided
     // merge_operator when opening DB.
     using DB::Merge;
     virtual Status Merge(const WriteOptions& options, ColumnFamilyHandle* column_family,
-                         const Slice& key, const Slice& value) override;
+                         const Slice& key, const Slice& value) NOOPE;
 
     // If keys[i] does not exist in the database, then the i'th returned status will be one for
     // which Status::IsNotFound() is true, and (*values)[i] will be set to some arbitrary value
@@ -104,7 +104,9 @@ namespace rocksdb {
     virtual std::vector<Status> MultiGet(const ReadOptions& options,
                                          const std::vector<ColumnFamilyHandle*>& column_family,
                                          const std::vector<Slice>& keys,
-                                         std::vector<std::string>* values) override;
+                                         std::vector<std::string>* values) override {
+      return std::vector<Status>();
+    }
 
     // Set the database entry for "key" to "value". If "key" already exists, it will be overwritten.
     // Returns OK on success, and a non-OK status on error.
@@ -131,7 +133,7 @@ namespace rocksdb {
     // Apply the specified updates to the database. If `updates` contains no update, WAL will
     // still be synced if options.sync=true. Returns OK on success, non-OK on failure.
     using DB::Write;
-    virtual Status Write(const WriteOptions& options, WriteBatch* updates) override;
+    virtual Status Write(const WriteOptions& options, WriteBatch* updates) NOOPE;
 
     // =============================================================================================
     // ITERATOR METHODS
@@ -428,6 +430,19 @@ namespace rocksdb {
 
     // Persistent memory fields
     PMEMobjpool* pmem_pool_;
+
+    // Leaf methods
+    void DeleteLeaf();
+    void FindLeaf(const Slice& key);
+    void FindLeafAndPrevLeaf(const Slice& key);
+    void SplitLeaf();
+
+    // Recovery methods
+    void Recover();
+    void RecoverDelete();
+    void RecoverSplit();
+    void RebuildInnerNodes();
+    void RebuildLogQueues();
 
   private:
     FPTreeDB(const FPTreeDB&);        // Prevent copying

@@ -5,7 +5,7 @@ FPTreeDB
 
 FPTreeDB is a RocksDB utility whose name and design is inspired by the paper "FPTree: A Hybrid SCM-DRAM Persistent and Concurrent B-Tree for Storage Class Memory."
 
-FPTreeDB bypasses the RocksDB LSM implementation entirely, as opposed to adding or optimizing memtable/table types within the existing LSM implementation. FPTreeDB uses Intel's NVM library (libpmemobj) to also bypass the Linux page cache and filesystem, which are known to incur significant overhead for RocksDB workloads.
+FPTreeDB bypasses the RocksDB LSM implementation entirely, as opposed to adding or optimizing memtable/table types within the existing LSM implementation. FPTreeDB uses NVML (see pmem.io) to also bypass the Linux page cache and filesystem, which are known to incur significant overhead for RocksDB workloads.
 
 As a utility, FPTreeDB does not modify the core RocksDB distribution, but only adds code at expected extension points. The structure of these extensions for FPTreeDB takes inspiration from existing SpatialDB and TransactionDB utilities, which provide high-level wrappers using the RocksDB API.
 
@@ -44,7 +44,7 @@ Existing files modified:
 Installation
 ------------
 
-Start with Ubuntu 16.04 (either desktop or server distribution) or other 64-bit Linux distribution. OSX and Windows are not supported by the Intel NVM library, so don't use those.
+Start with Ubuntu 16.04 (either desktop or server distribution) or other 64-bit Linux distribution. OSX and Windows are not supported by NVML, so don't use those.
 
 Install RocksDB required libraries:
 

@@ -35,7 +35,10 @@
 
 #include <string>
 #include <vector>
-#include <libpmemobj.h>
+#include <libpmemobj/make_persistent.hpp>
+#include <libpmemobj/persistent_ptr.hpp>
+#include <libpmemobj/pool.hpp>
+#include <libpmemobj/transaction.hpp>
 #include "rocksdb/db.h"
 
 #define NOOPE override { return Status::NotSupported(); }
@@ -45,8 +48,25 @@
 
 namespace rocksdb {
 
+  using nvml::obj::p;
+  using nvml::obj::persistent_ptr;
+  using nvml::obj::make_persistent;
+  using nvml::obj::transaction;
+  using nvml::obj::delete_persistent;
+  using nvml::obj::pool;
+
   struct FPTreeDBOptions {
     // Nothing yet
+  };
+
+  struct FPTreeDBLeaf {
+    // Nothing yet
+  };
+
+  struct FPTreeDBRoot {
+    p<uint64_t> opened;
+    p<uint64_t> closed;
+    persistent_ptr<FPTreeDBLeaf> head;
   };
 
   class FPTreeDB : public DB {
@@ -424,13 +444,6 @@ namespace rocksdb {
     // Hide constructor, call Open() to create instead
     FPTreeDB(const Options& options, const FPTreeDBOptions& dboptions, const std::string& dbname);
 
-    // Configuration fields
-    const std::string dbname_;
-    const DBOptions dboptions_;
-
-    // Persistent memory fields
-    PMEMobjpool* pmem_pool_;
-
     // Leaf methods
     void DeleteLeaf();
     void FindLeaf(const Slice& key);
@@ -443,11 +456,15 @@ namespace rocksdb {
     void RecoverSplit();
     void RebuildInnerNodes();
     void RebuildLogQueues();
+    void Shutdown();
 
   private:
+    const std::string dbname_;        // Name when constructed
+    const DBOptions dboptions_;       // Options when constructed
+    pool<FPTreeDBRoot> pop_;          // Persistent pool for root
+
     FPTreeDB(const FPTreeDB&);        // Prevent copying
     void operator=(const FPTreeDB&);  // Prevent assignment
-
   };
 
 }  // namespace rocksdb

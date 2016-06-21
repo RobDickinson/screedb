@@ -56,7 +56,7 @@ Install NVML:
 cd ~
 git clone https://github.com/pmem/nvml.git
 cd nvml
-sudo make install -j8
+sudo make EXPERIMENTAL=y install -j8            # C++ bindings are experimental
 ```
 
 Get the sources:
@@ -130,6 +130,7 @@ Use wizard to create project:
 When the project opens, add these lines to CMakeLists.txt:
 
 ```
+include_directories(/usr/local/include/libpmemobj)
 include_directories(${PROJECT_SOURCE_DIR})
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_SOURCE_DIR}/third-party/gtest-1.7.0/fused-src)
@@ -144,8 +145,17 @@ The .gitignore for this project ignores CMakeLists.txt and the entire .idea dire
 Related Work
 ------------
 
-RocksDB fork for KV/NVM pathfinding:
+**cpp_map**
 
--	Gerrit server at http://az-sg-sw01.ch.intel.com/gerrit
-	-	**Warning!** HTTP proxy must be disabled on Linux to connect to gerrit web UI
--	git clone -b dev/kv_pathfinding ssh://az-sg-sw01.ch.intel.com:29418/rocksdb rocksdb.kv
+Use of NVML C++ bindings by FPTreeDB was lifted from this example program. Many thanks to Tomasz Kapela for providing a great example to follow!
+
+**KV/NVM pathfinding**
+
+This research explores LSM optimizations in the context of an internal RocksDB fork.
+
+```
+Sign up on gerrit server at http://az-sg-sw01.ch.intel.com/gerrit
+**Warning!** HTTP proxy may need to be disabled on Ubuntu to connect to gerrit web UI
+
+git clone -b dev/kv_pathfinding ssh://az-sg-sw01.ch.intel.com:29418/rocksdb rocksdb.kv
+```

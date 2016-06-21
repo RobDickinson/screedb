@@ -56,33 +56,22 @@ namespace rocksdb {
   FPTreeDB::FPTreeDB(const Options& options, const FPTreeDBOptions& dboptions,
                      const std::string& dbname) : dbname_(dbname) {
     LOG("Opening database");
-
-    // Open existing file if accessible, or create a new one
     if (access(GetNamePtr(), F_OK) != 0) {
-      LOG("Creating new file");
-      if ((pmem_pool_ = pmemobj_create(GetNamePtr(), POBJ_LAYOUT_NAME(FPTreeDB),
-                                       PMEMOBJ_MIN_POOL, 0666)) == NULL) {
-        perror("pmemobj_create");
-        exit(1);
-      }
-      LOG("Created new file ok");
+      LOG("Creating new persistent pool");
+      pop_ = pool<FPTreeDBRoot>::create(GetNamePtr(), POBJ_LAYOUT_NAME(FPTreeDB),
+                                        PMEMOBJ_MIN_POOL, S_IRWXU);
     } else {
-      LOG("Opening existing file");
-      if ((pmem_pool_ = pmemobj_open(GetNamePtr(), POBJ_LAYOUT_NAME(FPTreeDB))) == NULL) {
-        perror("pmemobj_open");
-        exit(1);
-      }
-      LOG("Opened existing file ok");
+      pop_ = pool<FPTreeDBRoot>::open(GetNamePtr(), POBJ_LAYOUT_NAME(FPTreeDB));
     }
-
-    Recover(); // do initial recovery
+    Recover();
     LOG("Opened database ok");
   }
 
   // Safely close the database.
   FPTreeDB::~FPTreeDB() {
     LOG("Closing database");
-    pmemobj_close(pmem_pool_);
+    Shutdown();
+    pop_.close();
     LOG("Closed database ok");
   }
 
@@ -252,6 +241,22 @@ namespace rocksdb {
      9: RebuildLogQueues();
     */
     LOG("Recovering database");
+
+    // Create root if not already present
+    // @todo handle opened/closed inequality, including count correction
+    auto root = pop_.get_root();
+    if (root->head) {
+      LOG("Recovered head: opened=" << root->opened << ", closed=" << root->closed);
+      transaction::exec_tx(pop_, [&] { root->opened = root->opened + 1; });
+    } else {
+      LOG("Creating root");
+      transaction::exec_tx(pop_, [&] {
+        root->opened = 1;
+        root->closed = 0;
+        root->head = make_persistent<FPTreeDBLeaf>();
+      });
+    }
+
     RebuildInnerNodes();
     RebuildLogQueues();
     LOG("Recovered database ok");
@@ -303,6 +308,13 @@ namespace rocksdb {
   void FPTreeDB::RebuildLogQueues() {
     LOG("Rebuilding log queues");
     LOG("Rebuilt log queues ok");
+  }
+
+  void FPTreeDB::Shutdown() {
+    LOG("Shutting down database");
+    auto root = pop_.get_root();
+    transaction::exec_tx(pop_, [&] { root->closed = root->closed + 1; });
+    LOG("Shut down database ok");
   }
 
 }  // namespace rocksdb

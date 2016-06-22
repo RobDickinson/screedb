@@ -40,7 +40,14 @@ using namespace rocksdb;
 std::string kDBPath = "/tmp/fptreedb_example";
 
 int main() {
-  LOG("Starting");
+  LOG("Starting with these data structure sizes:");
+  LOG("  sizeof(LEAF_BITMAP_T) = " << sizeof(LEAF_BITMAP_T));
+  LOG("  sizeof(LEAF_FINGERPRINTS_T) = " << sizeof(LEAF_FINGERPRINTS_T));
+  LOG("  sizeof(LEAF_KEY_T) >= " << sizeof(LEAF_KEY_T));
+  LOG("  sizeof(LEAF_KEYVALUES_T) >= " << sizeof(LEAF_KEYVALUES_T));
+  LOG("  sizeof(LEAF_LOCK_T) = " << sizeof(LEAF_LOCK_T));
+  LOG("  sizeof(LEAF_PTR_T) = " << sizeof(LEAF_PTR_T));
+  LOG("  sizeof(LEAF_VALUE_T) >= " << sizeof(LEAF_VALUE_T));
 
   // set DB options
   Options options;

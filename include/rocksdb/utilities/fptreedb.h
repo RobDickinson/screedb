@@ -43,6 +43,16 @@
 
 #define NOOPE override { return Status::NotSupported(); }
 
+// persistent type definitions for leaf nodes
+#define LEAF_KEYS                 46
+#define LEAF_BITMAP_T             p<uint8_t>
+#define LEAF_FINGERPRINTS_T       p<std::array<uint8_t, LEAF_KEYS>>
+#define LEAF_KEY_T                p<Slice>
+#define LEAF_KEYVALUES_T          p<std::array<FPTreeDBKeyValue, LEAF_KEYS>>
+#define LEAF_LOCK_T               p<uint8_t>
+#define LEAF_PTR_T                persistent_ptr<FPTreeDBLeaf>
+#define LEAF_VALUE_T              p<std::string>
+
 // Database backed by NVML and "Fingerprinting Persistent Tree" implementation.
 // See examples/fptree_example.cc for usage.
 
@@ -59,14 +69,25 @@ namespace rocksdb {
     // Nothing yet
   };
 
+  struct FPTreeDBKeyValue {
+    LEAF_KEY_T key;                         // variable length key
+    LEAF_VALUE_T value;                     // variable length value
+  };
+
+  // @todo revisit field aligmnent proposal below (better for next & lock than the original?)
+  // ...or is it intentional to force a cache miss when checking lock? (by having at the end)
   struct FPTreeDBLeaf {
-    // Nothing yet
+    LEAF_PTR_T next;                        // 16 bytes, points to next leaf
+    LEAF_BITMAP_T bitmap;                   // 1 byte, tracks allocated keys
+    LEAF_LOCK_T lock;                       // 1 byte, boolean lock
+    LEAF_FINGERPRINTS_T fingerprints;       // 46 bytes, rest of cache line
+    LEAF_KEYVALUES_T keyvalues;             // actual tuples, sized to fit data
   };
 
   struct FPTreeDBRoot {
-    p<uint64_t> opened;
-    p<uint64_t> closed;
-    persistent_ptr<FPTreeDBLeaf> head;
+    p<uint64_t> opened;                     // number of times opened
+    p<uint64_t> closed;                     // number of times closed safely
+    LEAF_PTR_T head;                        // head leaf node
   };
 
   class FPTreeDB : public DB {

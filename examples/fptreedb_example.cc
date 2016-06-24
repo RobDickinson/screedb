@@ -30,6 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// Simple example for RocksDB-style database with "Fingerprinting Persistent Tree" and NVML backend.
+// See utilities/fptreedb/fptreedb.cc for implementation.
+
 #include <iostream>
 #include "rocksdb/utilities/fptreedb.h"
 

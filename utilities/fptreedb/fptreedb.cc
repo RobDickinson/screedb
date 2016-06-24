@@ -30,6 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// Implementation for RocksDB-style database with "Fingerprinting Persistent Tree" and NVML backend.
+// See examples/fptree_example.cc for usage.
+
 #ifndef ROCKSDB_LITE
 
 #ifndef __STDC_FORMAT_MACROS

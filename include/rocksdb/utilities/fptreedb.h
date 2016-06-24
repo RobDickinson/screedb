@@ -30,6 +30,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+// Header for RocksDB-style database with "Fingerprinting Persistent Tree" and NVML backend.
+// See utilities/fptreedb/fptreedb.cc for implementation.
+// See examples/fptree_example.cc for usage.
+
 #pragma once
 #ifndef ROCKSDB_LITE
 
@@ -53,17 +57,14 @@
 #define LEAF_PTR_T                persistent_ptr<FPTreeDBLeaf>
 #define LEAF_VALUE_T              p<std::string>
 
-// Database backed by NVML and "Fingerprinting Persistent Tree" implementation.
-// See examples/fptree_example.cc for usage.
+using nvml::obj::p;
+using nvml::obj::persistent_ptr;
+using nvml::obj::make_persistent;
+using nvml::obj::transaction;
+using nvml::obj::delete_persistent;
+using nvml::obj::pool;
 
 namespace rocksdb {
-
-  using nvml::obj::p;
-  using nvml::obj::persistent_ptr;
-  using nvml::obj::make_persistent;
-  using nvml::obj::transaction;
-  using nvml::obj::delete_persistent;
-  using nvml::obj::pool;
 
   struct FPTreeDBOptions {
     // Nothing yet

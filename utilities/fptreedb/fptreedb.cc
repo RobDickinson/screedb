@@ -135,7 +135,28 @@ namespace rocksdb {
     12:    speculative_lock.release();
     13:    return Val;
     */
-    return Status::NotSupported();
+
+    LOG("Get: key=" << key.data_);
+    auto root = pop_.get_root();
+    if (!root->head) {
+      LOG("Get failed, head not present");
+      return Status::NotFound();
+    } else {
+      auto leaf = root->head;
+      for (int i = 0; true; i++) {
+        auto kv = leaf->keyvalues[0];
+        if (strcmp(key.data_, kv[0].key) == 0) {
+          value->append(kv[0].value);
+          LOG("Get success, key=" << key.data_ << ", value=" << kv[0].value);
+          return Status::OK();
+        } else if (leaf->next) {
+          leaf = leaf->next;
+        } else {
+          LOG("Get failed, no value for key=" << key.data_);
+          return Status::NotFound();
+        }
+      }
+    }
   }
 
   // Set the database entry for "key" to "value". If "key" already exists, it will be overwritten.
@@ -169,7 +190,24 @@ namespace rocksdb {
     23:    speculative_lock.release();
     24: Leaf.lock = 0;
     */
-    return Status::NotSupported();
+
+    LOG("Put: key=" << key.data_ << ", value=" << value.data_);
+    auto root = pop_.get_root();
+    transaction::exec_tx(pop_, [&] {
+      // add new leaf in head position
+      auto old_head = root->head;
+      root->head = make_persistent<FPTreeDBLeaf>();
+      auto head = root->head;
+      head->next = old_head;
+
+      // use only the first keyvalue slot in the leaf
+      head->lock = 1;
+      head->keyvalues[0] = make_persistent<FPTreeDBKeyValue>();
+      auto kv = head->keyvalues[0];
+      memcpy(kv->key, key.data_, key.size() <= KEY_LENGTH ? key.size() : KEY_LENGTH);
+      memcpy(kv->value, value.data_, value.size() <= VALUE_LENGTH ? value.size() : VALUE_LENGTH);
+    });
+    return Status::OK();
   }
 
   // ===============================================================================================
@@ -248,16 +286,17 @@ namespace rocksdb {
     // Create root if not already present
     // @todo handle opened/closed inequality, including count correction
     auto root = pop_.get_root();
-    if (root->head) {
-      LOG("Recovered head: opened=" << root->opened << ", closed=" << root->closed);
-      transaction::exec_tx(pop_, [&] { root->opened = root->opened + 1; });
-    } else {
+    if (!root->head) {
       LOG("Creating root");
       transaction::exec_tx(pop_, [&] {
         root->opened = 1;
         root->closed = 0;
-        root->head = make_persistent<FPTreeDBLeaf>();
       });
+    } else {
+      LOG("Recovering head: opened=" << root->opened << ", closed=" << root->closed);
+      transaction::exec_tx(pop_, [&] { root->opened = root->opened + 1; });
+      RecoverSplit();
+      RecoverDelete();
     }
 
     RebuildInnerNodes();
@@ -305,6 +344,17 @@ namespace rocksdb {
 
   void FPTreeDB::RebuildInnerNodes() {
     LOG("Rebuilding inner nodes");
+    auto root = pop_.get_root();
+    if (root->head) {
+      auto leaf = root->head;
+      for (int i = 0; true; i++) {
+        std::cout << "  leaf[" << i << "] has lock=" << (leaf->lock == 1 ? '1' : '0') << "\n";
+        auto kv = leaf->keyvalues[0];
+        std::cout << "  leaf[" << i << "] has key=" << std::string(kv[0].key) << "\n";
+        std::cout << "  leaf[" << i << "] has value=" << std::string(kv[0].value) << "\n";
+        if (leaf->next) leaf = leaf->next; else break;
+      }
+    }
     LOG("Rebuilt inner nodes ok");
   }
 

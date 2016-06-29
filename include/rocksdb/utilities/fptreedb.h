@@ -38,7 +38,6 @@
 #ifndef ROCKSDB_LITE
 
 #include <string>
-#include <vector>
 #include <libpmemobj/make_persistent.hpp>
 #include <libpmemobj/persistent_ptr.hpp>
 #include <libpmemobj/pool.hpp>
@@ -47,15 +46,17 @@
 
 #define NOOPE override { return Status::NotSupported(); }
 
-// persistent type definitions for leaf nodes
-#define LEAF_KEYS                 46
+// constants for key/value structures
+#define KEY_LENGTH                8
+#define VALUE_LENGTH              16
+
+// persistent type macros for leaf nodes
 #define LEAF_BITMAP_T             p<uint8_t>
-#define LEAF_FINGERPRINTS_T       p<std::array<uint8_t, LEAF_KEYS>>
-#define LEAF_KEY_T                p<Slice>
-#define LEAF_KEYVALUES_T          p<std::array<FPTreeDBKeyValue, LEAF_KEYS>>
+#define LEAF_FINGERPRINT_T        p<uint8_t>
+#define LEAF_KEYS                 46
+#define LEAF_KEYVALUE_T           persistent_ptr<FPTreeDBKeyValue>
 #define LEAF_LOCK_T               p<uint8_t>
 #define LEAF_PTR_T                persistent_ptr<FPTreeDBLeaf>
-#define LEAF_VALUE_T              p<std::string>
 
 using nvml::obj::p;
 using nvml::obj::persistent_ptr;
@@ -70,25 +71,28 @@ namespace rocksdb {
     // Nothing yet
   };
 
-  struct FPTreeDBKeyValue {
-    LEAF_KEY_T key;                         // variable length key
-    LEAF_VALUE_T value;                     // variable length value
+  typedef char FPTreeDBKey[KEY_LENGTH + 1];           // null-padded fixed-length key buffer
+  typedef char FPTreeDBValue[VALUE_LENGTH + 1];       // null-padded fixed-length value buffer
+
+  struct FPTreeDBKeyValue {                           // single key/value pair
+    FPTreeDBKey key;
+    FPTreeDBValue value;
   };
 
   // @todo revisit field aligmnent proposal below (better for next & lock than the original?)
   // ...or is it intentional to force a cache miss when checking lock? (by having at the end)
   struct FPTreeDBLeaf {
-    LEAF_PTR_T next;                        // 16 bytes, points to next leaf
-    LEAF_BITMAP_T bitmap;                   // 1 byte, tracks allocated keys
-    LEAF_LOCK_T lock;                       // 1 byte, boolean lock
-    LEAF_FINGERPRINTS_T fingerprints;       // 46 bytes, rest of cache line
-    LEAF_KEYVALUES_T keyvalues;             // actual tuples, sized to fit data
+    LEAF_PTR_T next;                                  // 16 bytes, points to next leaf
+    LEAF_BITMAP_T bitmap;                             // 1 byte, tracks allocated keys
+    LEAF_LOCK_T lock;                                 // 1 byte, boolean lock
+    LEAF_FINGERPRINT_T fingerprints[LEAF_KEYS];       // 46 bytes, rest of cache line
+    LEAF_KEYVALUE_T keyvalues[LEAF_KEYS];             // contained key/value pairs
   };
 
   struct FPTreeDBRoot {
-    p<uint64_t> opened;                     // number of times opened
-    p<uint64_t> closed;                     // number of times closed safely
-    LEAF_PTR_T head;                        // head leaf node
+    p<uint64_t> opened;                               // number of times opened
+    p<uint64_t> closed;                               // number of times closed safely
+    LEAF_PTR_T head;                                  // head leaf node
   };
 
   class FPTreeDB : public DB {

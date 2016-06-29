@@ -44,13 +44,9 @@ std::string kDBPath = "/tmp/fptreedb_example";
 
 int main() {
   LOG("Starting with these data structure sizes:");
-  LOG("  sizeof(LEAF_BITMAP_T) = " << sizeof(LEAF_BITMAP_T));
-  LOG("  sizeof(LEAF_FINGERPRINTS_T) = " << sizeof(LEAF_FINGERPRINTS_T));
-  LOG("  sizeof(LEAF_KEY_T) >= " << sizeof(LEAF_KEY_T));
-  LOG("  sizeof(LEAF_KEYVALUES_T) >= " << sizeof(LEAF_KEYVALUES_T));
-  LOG("  sizeof(LEAF_LOCK_T) = " << sizeof(LEAF_LOCK_T));
-  LOG("  sizeof(LEAF_PTR_T) = " << sizeof(LEAF_PTR_T));
-  LOG("  sizeof(LEAF_VALUE_T) >= " << sizeof(LEAF_VALUE_T));
+  LOG("  sizeof(FPTreeDBRoot) = " << sizeof(FPTreeDBRoot));
+  LOG("  sizeof(FPTreeDBKeyValue) = " << sizeof(FPTreeDBKeyValue));
+  LOG("  sizeof(FPTreeDBLeaf) = " << sizeof(FPTreeDBLeaf));
 
   // set DB options
   Options options;
@@ -64,31 +60,61 @@ int main() {
   assert(db->GetName() == kDBPath);
   LOG("Database is ready for use");
 
-  // put key-value
-  s = db->Put(WriteOptions(), "key1", "value");
-  assert(s.IsNotSupported());
+  // get without expecting to find key
+  {
+    std::string value;
+    s = db->Get(ReadOptions(), "waldo", &value);
+    assert(s.IsNotFound());
+  }
 
-//  TEMPORARILY DISABLED:
-//  assert(s.ok());
-//  std::string value;
-//  // get value
-//  s = db->Get(ReadOptions(), "key1", &value);
-//  assert(s.ok());
-//  assert(value == "value");
-//
-//  // atomically apply a set of updates
-//  {
-//    WriteBatch batch;
-//    batch.Delete("key1");
-//    batch.Put("key2", value);
-//    s = db->Write(WriteOptions(), &batch);
-//  }
-//
-//  s = db->Get(ReadOptions(), "key1", &value);
-//  assert(s.IsNotFound());
-//
-//  db->Get(ReadOptions(), "key2", &value);
-//  assert(value == "value");
+  // put/get for simple value
+  {
+    s = db->Put(WriteOptions(), "key1", "value1");
+    assert(s.ok());
+    std::string value;
+    s = db->Get(ReadOptions(), "key1", &value);
+    assert(s.ok());
+    assert(value == "value1");
+  }
+
+  std::string too_big = std::string("ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCDEFGHIJKLMNOPQRSTUVW");
+
+  // put/get for silently truncated key
+  {
+    s = db->Put(WriteOptions(), too_big, "value2");
+    assert(s.ok());
+    std::string value;
+    s = db->Get(ReadOptions(), too_big, &value);
+    assert(s.IsNotFound()); // because the key was truncated!
+    s = db->Get(ReadOptions(), too_big.substr(0, KEY_LENGTH), &value);
+    assert(s.ok());
+    assert(value == "value2");
+  }
+
+  // put/get for silently truncated value
+  {
+    s = db->Put(WriteOptions(), "key3", too_big);
+    assert(s.ok());
+    std::string value;
+    s = db->Get(ReadOptions(), "key3", &value);
+    assert(s.ok());
+    assert(value == too_big.substr(0, VALUE_LENGTH));
+  }
+
+  // atomically apply a set of updates
+  {
+    WriteBatch batch;
+    batch.Delete("key1");
+    batch.Put("key2", "value2");
+    s = db->Write(WriteOptions(), &batch);
+    assert(s.IsNotSupported());
+    // assert(s.ok());
+    // std::string value;
+    // s = db->Get(ReadOptions(), "key1", &value);
+    // assert(s.IsNotFound());
+    // db->Get(ReadOptions(), "key2", &value);
+    // assert(value == "value");
+  }
 
   // safely close DB
   delete db;

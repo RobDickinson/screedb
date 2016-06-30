@@ -37,6 +37,7 @@
 #include "rocksdb/utilities/fptreedb.h"
 
 #define LOG(msg) std::cout << "[fptreedb_example] " << msg << "\n"
+#define LOG2(msg) std::cout << "\n[fptreedb_example] " << msg << "\n"
 
 using namespace rocksdb;
 
@@ -48,26 +49,32 @@ int main() {
   LOG("  sizeof(FPTreeDBKeyValue) = " << sizeof(FPTreeDBKeyValue));
   LOG("  sizeof(FPTreeDBLeaf) = " << sizeof(FPTreeDBLeaf));
 
-  // set DB options
+  LOG("Setting database options");
   Options options;
-  options.create_if_missing = true;
+  options.create_if_missing = true;  // todo option is ignored, see #7
   FPTreeDBOptions fptree_options;
 
-  // open DB
+  LOG("Opening database");
   FPTreeDB* db;
   Status s = FPTreeDB::Open(options, fptree_options, kDBPath, &db);
   assert(s.ok());
   assert(db->GetName() == kDBPath);
   LOG("Database is ready for use");
 
-  // get without expecting to find key
+  LOG2("Delete nonexistent key");
+  {
+    s = db->Delete(WriteOptions(), "nada");
+    assert(s.ok());
+  }
+
+  LOG2("Get nonexistent key");
   {
     std::string value;
     s = db->Get(ReadOptions(), "waldo", &value);
     assert(s.IsNotFound());
   }
 
-  // put/get for simple value
+  LOG2("Put/Get for small value");
   {
     s = db->Put(WriteOptions(), "key1", "value1");
     assert(s.ok());
@@ -79,7 +86,7 @@ int main() {
 
   std::string too_big = std::string("ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCDEFGHIJKLMNOPQRSTUVW");
 
-  // put/get for silently truncated key
+  LOG2("Put/Get for silently truncated key");
   {
     s = db->Put(WriteOptions(), too_big, "value2");
     assert(s.ok());
@@ -91,7 +98,7 @@ int main() {
     assert(value == "value2");
   }
 
-  // put/get for silently truncated value
+  LOG2("Put/Get for silently truncated value");
   {
     s = db->Put(WriteOptions(), "key3", too_big);
     assert(s.ok());
@@ -101,7 +108,36 @@ int main() {
     assert(value == too_big.substr(0, VALUE_LENGTH));
   }
 
-  // atomically apply a set of updates
+  LOG2("Put for existing value");
+  {
+    std::string value;
+    s = db->Get(ReadOptions(), "key1", &value);
+    assert(s.ok());
+    assert(value == "value1");  // from earlier step
+    s = db->Put(WriteOptions(), "key1", "value_replaced");
+    assert(s.ok());
+    std::string new_value;
+    s = db->Get(ReadOptions(), "key1", &new_value);
+    assert(s.ok());
+    assert(new_value == "value_replaced");
+  }
+
+  LOG2("Delete/Get/Delete for existing value");
+  {
+    s = db->Put(WriteOptions(), "tmpkey", "tmpvalue1");
+    assert(s.ok());
+    s = db->Put(WriteOptions(), "tmpkey", "tmpvalue2");
+    assert(s.ok());
+    s = db->Delete(WriteOptions(), "tmpkey");
+    assert(s.ok());
+    std::string value;
+    s = db->Get(ReadOptions(), "tmpkey", &value);
+    assert(s.IsNotFound());
+    s = db->Delete(WriteOptions(), "tmpkey");  // no harm in deleting twice
+    assert(s.ok());
+  }
+
+  // Atomic writes not supported yet, see #21
   {
     WriteBatch batch;
     batch.Delete("key1");
@@ -116,7 +152,7 @@ int main() {
     // assert(value == "value");
   }
 
-  // safely close DB
+  LOG2("Closing database");
   delete db;
 
   LOG("Finished successfully");

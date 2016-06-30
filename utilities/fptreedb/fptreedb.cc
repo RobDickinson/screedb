@@ -43,7 +43,8 @@
 #include <unistd.h>
 #include "rocksdb/utilities/fptreedb.h"
 
-#define LOG(msg) std::cout << "[FPTreeDB:" << GetName() << "] " << msg << "\n"
+#define DO_LOG 1
+#define LOG(msg) if (DO_LOG) std::cout << "[FPTreeDB:" << GetName() << "] " << msg << "\n"
 
 namespace rocksdb {
 
@@ -111,7 +112,25 @@ namespace rocksdb {
     21:    Leaf.Bitmap[slot] = 0; Persist(Leaf.Bitmap[slot]);
     22:    Leaf.lock = 0;
     */
-    return Status::NotSupported();
+
+    LOG("Delete key=" << key.data_);
+    auto root = pop_.get_root();
+    if (!root->head) {
+      LOG("Delete skipped, head not present");
+      return Status::OK();
+    } else {
+      auto leaf = root->head;
+      for (int i = 0; true; i++) {
+        auto kv = leaf->keyvalues[0];
+        if (strcmp(kv->key, key.data_) == 0) {
+          LOG("Deleting key=" << kv->key << ", value=" << kv->value);
+          transaction::exec_tx(pop_, [&] { kv->key[0] = 0; });
+        } else if (leaf->next) {
+          leaf = leaf->next;
+        } else break;
+      }
+    }
+    return Status::OK();
   }
 
   // If the database contains an entry for "key" store the corresponding value in *value
@@ -136,23 +155,23 @@ namespace rocksdb {
     13:    return Val;
     */
 
-    LOG("Get: key=" << key.data_);
+    LOG("Get key=" << key.data_);
     auto root = pop_.get_root();
     if (!root->head) {
-      LOG("Get failed, head not present");
+      LOG("Get not found, head not present");
       return Status::NotFound();
     } else {
       auto leaf = root->head;
       for (int i = 0; true; i++) {
         auto kv = leaf->keyvalues[0];
-        if (strcmp(key.data_, kv[0].key) == 0) {
-          value->append(kv[0].value);
-          LOG("Get success, key=" << key.data_ << ", value=" << kv[0].value);
+        if (strcmp(kv->key, key.data_) == 0) {
+          value->append(kv->value);  // todo more efficient way?
+          LOG("Get found key=" << kv->key << ", value=" << kv->value);
           return Status::OK();
         } else if (leaf->next) {
           leaf = leaf->next;
         } else {
-          LOG("Get failed, no value for key=" << key.data_);
+          LOG("Get not found for key=" << key.data_);
           return Status::NotFound();
         }
       }
@@ -191,7 +210,7 @@ namespace rocksdb {
     24: Leaf.lock = 0;
     */
 
-    LOG("Put: key=" << key.data_ << ", value=" << value.data_);
+    LOG("Put key=" << key.data_ << ", value=" << value.data_);
     auto root = pop_.get_root();
     transaction::exec_tx(pop_, [&] {
       // add new leaf in head position
@@ -348,10 +367,8 @@ namespace rocksdb {
     if (root->head) {
       auto leaf = root->head;
       for (int i = 0; true; i++) {
-        std::cout << "  leaf[" << i << "] has lock=" << (leaf->lock == 1 ? '1' : '0') << "\n";
         auto kv = leaf->keyvalues[0];
-        std::cout << "  leaf[" << i << "] has key=" << std::string(kv[0].key) << "\n";
-        std::cout << "  leaf[" << i << "] has value=" << std::string(kv[0].value) << "\n";
+        LOG("  leaf[" << i << "] key=" << kv->key << ", value=" << kv->value);
         if (leaf->next) leaf = leaf->next; else break;
       }
     }

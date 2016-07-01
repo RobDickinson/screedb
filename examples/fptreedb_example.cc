@@ -124,7 +124,7 @@ int main() {
 
   LOG2("Delete/Get/Delete for existing value");
   {
-    s = db->Put(WriteOptions(), "tmpkey", "tmpvalue1");
+    s = db->Merge(WriteOptions(), "tmpkey", "tmpvalue1");
     assert(s.ok());
     s = db->Put(WriteOptions(), "tmpkey", "tmpvalue2");
     assert(s.ok());
@@ -135,6 +135,31 @@ int main() {
     assert(s.IsNotFound());
     s = db->Delete(WriteOptions(), "tmpkey");  // no harm in deleting twice
     assert(s.ok());
+  }
+
+  LOG2("MultiGet for existing and nonexistent values");
+  {
+    s = db->Put(WriteOptions(), "tmpkey", "tmpvalue1");
+    assert(s.ok());
+    s = db->Put(WriteOptions(), "tmpkey2", "tmpvalue2");
+    assert(s.ok());
+    std::vector<std::string> values = std::vector<std::string>();
+    std::vector<Slice> keys = std::vector<Slice>();
+    keys.push_back("tmpkey");
+    keys.push_back("tmpkey2");
+    keys.push_back("tmpkey3");
+    keys.push_back("tmpkey");
+    std::vector<Status> status = db->MultiGet(ReadOptions(), keys, &values);
+    assert(status.size() == 4);
+    assert(status.at(0).ok());
+    assert(status.at(1).ok());
+    assert(status.at(2).IsNotFound());
+    assert(status.at(3).ok());
+    assert(values.size() == 4);
+    assert(values.at(0) == "tmpvalue1");
+    assert(values.at(1) == "tmpvalue2");
+    assert(values.at(2) == "");
+    assert(values.at(3) == "tmpvalue1");
   }
 
   // Atomic writes not supported yet, see #21

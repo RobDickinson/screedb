@@ -137,7 +137,9 @@ namespace rocksdb {
     // merge_operator when opening DB.
     using DB::Merge;
     virtual Status Merge(const WriteOptions& options, ColumnFamilyHandle* column_family,
-                         const Slice& key, const Slice& value) NOOPE;
+                         const Slice& key, const Slice& value) {
+      return Put(options, column_family, key, value);  // todo not using merge_operator, see #7
+    }
 
     // If keys[i] does not exist in the database, then the i'th returned status will be one for
     // which Status::IsNotFound() is true, and (*values)[i] will be set to some arbitrary value
@@ -150,9 +152,7 @@ namespace rocksdb {
     virtual std::vector<Status> MultiGet(const ReadOptions& options,
                                          const std::vector<ColumnFamilyHandle*>& column_family,
                                          const std::vector<Slice>& keys,
-                                         std::vector<std::string>* values) override {
-      return std::vector<Status>();
-    }
+                                         std::vector<std::string>* values) override;
 
     // Set the database entry for "key" to "value". If "key" already exists, it will be overwritten.
     // Returns OK on success, and a non-OK status on error.

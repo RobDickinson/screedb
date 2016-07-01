@@ -178,6 +178,29 @@ namespace rocksdb {
     }
   }
 
+  // If keys[i] does not exist in the database, then the i'th returned status will be one for
+  // which Status::IsNotFound() is true, and (*values)[i] will be set to some arbitrary value
+  // (often ""). Otherwise, the i'th returned status will have Status::ok() true, and
+  // (*values)[i] will store the value associated with keys[i].
+  // (*values) will always be resized to be the same size as (keys).
+  // Similarly, the number of returned statuses will be the number of keys.
+  // Note: keys will not be "de-duplicated". Duplicate keys will return duplicate values in order.
+  std::vector<Status> FPTreeDB::MultiGet(const ReadOptions& options,
+                                         const std::vector<ColumnFamilyHandle*>& column_family,
+                                         const std::vector<Slice>& keys,
+                                         std::vector<std::string>* values) {
+    LOG("MultiGet for " << keys.size() << " keys");
+    std::vector<Status> status = std::vector<Status>();
+    for (auto& key: keys) {
+      std::string value;
+      Status s = Get(options, key.data_, &value);
+      status.push_back(s);
+      values->push_back(s.ok() ? value : "");
+    }
+    LOG("MultiGet done for " << keys.size() << " keys");
+    return status;
+  }
+
   // Set the database entry for "key" to "value". If "key" already exists, it will be overwritten.
   // Returns OK on success, and a non-OK status on error.
   Status FPTreeDB::Put(const WriteOptions& options, ColumnFamilyHandle* column_family,

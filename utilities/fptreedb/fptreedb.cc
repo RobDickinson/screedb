@@ -33,17 +33,15 @@
 // Implementation for RocksDB-style database with "Fingerprinting Persistent Tree" and NVML backend.
 // See examples/fptree_example.cc for usage.
 
-#ifndef ROCKSDB_LITE
-
 #ifndef __STDC_FORMAT_MACROS
 #define __STDC_FORMAT_MACROS
 #endif
 
 #include <iostream>
 #include <unistd.h>
-#include "rocksdb/utilities/fptreedb.h"
+#include "fptreedb.h"
 
-#define DO_LOG 1
+#define DO_LOG 0
 #define LOG(msg) if (DO_LOG) std::cout << "[FPTreeDB:" << GetName() << "] " << msg << "\n"
 
 namespace rocksdb {
@@ -411,5 +409,3 @@ namespace rocksdb {
   }
 
 }  // namespace rocksdb
-
-#endif  // ROCKSDB_LITE

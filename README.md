@@ -15,7 +15,6 @@ Contents
 <ul>
 <li><a href="#project_structure">Project Structure</a></li>
 <li><a href="#installation">Installation</a></li>
-<li><a href="#building_and_running_tests">Building and Running Tests</a></li>
 <li><a href="#configuring_clion_project">Configuring CLion Project</a></li>
 <li><a href="#related_work">Related Work</a></li>
 </ul>
@@ -25,19 +24,14 @@ Contents
 Project Structure
 -----------------
 
-This project is based on RocksDB 4.6.1, which is a stable public release.
+This project is based on RocksDB 4.6.1, which is a stable public release. Files were added to this base distribution but no existing files from RocksDB were modified.
 
 New files added:
 
--	include/rocksdb/utilities/fptreedb.h (declares FPTreeDB class)
+-	utilities/fptreedb/fptreedb.h (FPTreeDB class header)
 -	utilities/fptreedb/fptreedb.cc (FPTreeDB class implementation)
--	examples/fptreedb_example.cc (test program adapted from simple_example)
-
-Existing files modified:
-
--	src.mk (to include FPTreeDB in static library)
--	examples/.gitignore (to ignore fptreedb_example)
--	examples/Makefile (to build fptreedb_example)
+-	utilities/fptreedb/fptreedb_example.cc (small example adapted from simple_example)
+-	utilities/fptreedb/fptreedb_test.cc (unit tests using Google C++ Testing Framework)
 
 <a name="installation"/>
 
@@ -66,49 +60,13 @@ cd ~
 git clone https://github.com/RobDickinson/fptreedb.git
 ```
 
-<a name="building_and_running_tests"/>
-
-Building and Running Tests
---------------------------
-
-vi ~/fptreedb-env.sh, add:
+Run the tests:
 
 ```
-#!/bin/bash -e
-export FPTREEDB_HOME=$HOME/fptreedb
-```
-
-vi ~/fptreedb-test.sh, add:
-
-```
-#!/bin/bash -e
-rm -rf /tmp/fptreedb_example
-pushd . > /dev/null
-cd $FPTREEDB_HOME
-make static_lib -j8
-cd examples
-make fptreedb_example
-./fptreedb_example
-popd > /dev/null
-```
-
-To run tests:
-
-```
-chmod +x ~/fptreedb*
-source ~/fptreedb-env.sh
-~/fptreedb-test.sh
-```
-
-To run tests on underlying RocksDB distribution:
-
-```
-source ~/fptreedb-env.sh
-cd $FPTREEDB_HOME
-make -j8                    # build everything
-make check                  # run RocksDB tests
-make check V=1              # use verbose mode if something fails
-make clean                  # clean up afterwards
+cd fptreedb
+make static_lib -j8            # build RocksDB distribution
+cd utilities/fptreedb
+make                           # build and run FPTreeDB tests
 ```
 
 <a name="configuring_clion_project"/>

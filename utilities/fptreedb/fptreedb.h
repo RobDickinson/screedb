@@ -35,7 +35,6 @@
 // See examples/fptree_example.cc for usage.
 
 #pragma once
-#ifndef ROCKSDB_LITE
 
 #include <string>
 #include <libpmemobj/make_persistent.hpp>
@@ -494,5 +493,3 @@ namespace rocksdb {
   };
 
 }  // namespace rocksdb
-
-#endif  // ROCKSDB_LITE

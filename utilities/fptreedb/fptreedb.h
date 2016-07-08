@@ -38,16 +38,13 @@
 
 #include <string>
 #include <libpmemobj/make_persistent.hpp>
+#include <libpmemobj/make_persistent_array.hpp>
 #include <libpmemobj/persistent_ptr.hpp>
 #include <libpmemobj/pool.hpp>
 #include <libpmemobj/transaction.hpp>
 #include "rocksdb/db.h"
 
 #define NOOPE override { return Status::NotSupported(); }
-
-// constants for key/value structures
-#define KEY_LENGTH                8
-#define VALUE_LENGTH              16
 
 // persistent type macros for leaf nodes
 #define LEAF_BITMAP_T             p<uint8_t>
@@ -71,12 +68,9 @@ struct FPTreeDBOptions {
   // Nothing yet
 };
 
-typedef char FPTreeDBKey[KEY_LENGTH + 1];           // null-padded fixed-length key buffer
-typedef char FPTreeDBValue[VALUE_LENGTH + 1];       // null-padded fixed-length value buffer
-
 struct FPTreeDBKeyValue {                           // single key/value pair
-  FPTreeDBKey key;
-  FPTreeDBValue value;
+  persistent_ptr<char[]> key_ptr;                   // null-padded variable-length key
+  persistent_ptr<char[]> value_ptr;                 // null-padded variable-length value
 };
 
 // @todo revisit field aligmnent proposal below (better for next & lock than the original?)

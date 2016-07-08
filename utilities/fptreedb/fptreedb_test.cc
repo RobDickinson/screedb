@@ -52,67 +52,96 @@ public:
 
   FPTreeDBTest() {
     std::remove(kDBPath.c_str());
+    Open();
+  }
+
+  ~FPTreeDBTest() { delete db; }
+
+  void Reopen() {
+    delete db;
+    Open();
+  }
+
+private:
+  void Open() {
     Options options;
-    options.create_if_missing = true;  // todo option is ignored, see #7
+    options.create_if_missing = true;  // todo options are ignored, see #7
     FPTreeDBOptions fptree_options;
     Status s = FPTreeDB::Open(options, fptree_options, kDBPath, &db);
     assert(s.ok() && db->GetName() == kDBPath);
   }
-
-  ~FPTreeDBTest() { delete db; }
 };
 
-TEST_F(FPTreeDBTest, DeleteExistingTest) {
-  Status s = db->Put(WriteOptions(), "tmpkey", "tmpvalue1");
-  ASSERT_TRUE(s.ok());
-  s = db->Delete(WriteOptions(), "tmpkey");
-  ASSERT_TRUE(s.ok());
+// =============================================================================================
+// SINGLE-OPEN TESTS
+// =============================================================================================
+
+TEST_F(FPTreeDBTest, DeleteAllTest) {
+  ASSERT_TRUE(db->Put(WriteOptions(), "tmpkey", "tmpvalue1").ok());
+  ASSERT_TRUE(db->Delete(WriteOptions(), "tmpkey").ok());
+  // @todo additional verification for newly empty db
+  ASSERT_TRUE(db->Put(WriteOptions(), "tmpkey1", "tmpvalue1").ok());
   std::string value;
-  s = db->Get(ReadOptions(), "tmpkey", &value);
-  ASSERT_TRUE(s.IsNotFound());
-  s = db->Delete(WriteOptions(), "tmpkey");  // no harm in deleting twice
-  ASSERT_TRUE(s.ok());
+  ASSERT_TRUE(db->Get(ReadOptions(), "tmpkey1", &value).ok() && value == "tmpvalue1");
+}
+
+TEST_F(FPTreeDBTest, DeleteExistingTest) {
+  ASSERT_TRUE(db->Put(WriteOptions(), "tmpkey1", "tmpvalue1").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "tmpkey2", "tmpvalue2").ok());
+  ASSERT_TRUE(db->Delete(WriteOptions(), "tmpkey1").ok());
+  ASSERT_TRUE(db->Delete(WriteOptions(), "tmpkey1").ok()); // ok to delete twice
+  std::string value;
+  ASSERT_TRUE(db->Get(ReadOptions(), "tmpkey1", &value).IsNotFound());
+  ASSERT_TRUE(db->Get(ReadOptions(), "tmpkey2", &value).ok() && value == "tmpvalue2");
 }
 
 TEST_F(FPTreeDBTest, DeleteHeadlessTest) {
-  Status s = db->Delete(WriteOptions(), "nada");
-  ASSERT_TRUE(s.ok());
+  ASSERT_TRUE(db->Delete(WriteOptions(), "nada").ok());
 }
 
 TEST_F(FPTreeDBTest, DeleteNonexistentTest) {
-  Status s = db->Put(WriteOptions(), "key1", "value1");
-  ASSERT_TRUE(s.ok());
-  s = db->Delete(WriteOptions(), "nada");
-  ASSERT_TRUE(s.ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
+  ASSERT_TRUE(db->Delete(WriteOptions(), "nada").ok());
 }
 
 TEST_F(FPTreeDBTest, GetHeadlessTest) {
   std::string value;
-  Status s = db->Get(ReadOptions(), "waldo", &value);
-  ASSERT_TRUE(s.IsNotFound());
+  ASSERT_TRUE(db->Get(ReadOptions(), "waldo", &value).IsNotFound());
 }
 
 TEST_F(FPTreeDBTest, GetNonexistentTest) {
-  Status s = db->Put(WriteOptions(), "key1", "value1");
-  ASSERT_TRUE(s.ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
   std::string value;
-  s = db->Get(ReadOptions(), "waldo", &value);
-  ASSERT_TRUE(s.IsNotFound());
+  ASSERT_TRUE(db->Get(ReadOptions(), "waldo", &value).IsNotFound());
+}
+
+TEST_F(FPTreeDBTest, GetOneOfManyTest) {
+  ASSERT_TRUE(db->Put(WriteOptions(), "abc", "A1").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "def", "B2").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "hij", "C3").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "jkl", "D4").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "mno", "E5").ok());
+  std::string value1;
+  ASSERT_TRUE(db->Get(ReadOptions(), "abc", &value1).ok() && value1 == "A1");
+  std::string value2;
+  ASSERT_TRUE(db->Get(ReadOptions(), "def", &value2).ok() && value2 == "B2");
+  std::string value3;
+  ASSERT_TRUE(db->Get(ReadOptions(), "hij", &value3).ok() && value3 == "C3");
+  std::string value4;
+  ASSERT_TRUE(db->Get(ReadOptions(), "jkl", &value4).ok() && value4 == "D4");
+  std::string value5;
+  ASSERT_TRUE(db->Get(ReadOptions(), "mno", &value5).ok() && value5 == "E5");
 }
 
 TEST_F(FPTreeDBTest, MergeTest) {
-  Status s = db->Merge(WriteOptions(), "key1", "value1");
-  ASSERT_TRUE(s.ok());
+  ASSERT_TRUE(db->Merge(WriteOptions(), "key1", "value1").ok());
   std::string value;
-  s = db->Get(ReadOptions(), "key1", &value);
-  ASSERT_TRUE(s.ok() && value == "value1");
+  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &value).ok() && value == "value1");
 }
 
 TEST_F(FPTreeDBTest, MultiGetTest) {
-  Status s = db->Put(WriteOptions(), "tmpkey", "tmpvalue1");
-  ASSERT_TRUE(s.ok());
-  s = db->Put(WriteOptions(), "tmpkey2", "tmpvalue2");
-  ASSERT_TRUE(s.ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "tmpkey", "tmpvalue1").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "tmpkey2", "tmpvalue2").ok());
   std::vector<std::string> values = std::vector<std::string>();
   std::vector<Slice> keys = std::vector<Slice>();
   keys.push_back("tmpkey");
@@ -128,57 +157,89 @@ TEST_F(FPTreeDBTest, MultiGetTest) {
   ASSERT_TRUE(status.at(3).ok() && values.at(3) == "tmpvalue1");
 }
 
-TEST_F(FPTreeDBTest, PutTest) {
-  Status s = db->Put(WriteOptions(), "key1", "value1");
-  ASSERT_TRUE(s.ok());
-  std::string value;
-  s = db->Get(ReadOptions(), "key1", &value);
-  ASSERT_TRUE(s.ok() && value == "value1");
-}
-
 TEST_F(FPTreeDBTest, PutExistingTest) {
-  Status s = db->Put(WriteOptions(), "key1", "value1");
-  ASSERT_TRUE(s.ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
   std::string value;
-  s = db->Get(ReadOptions(), "key1", &value);
-  ASSERT_TRUE(s.ok() && value == "value1");
-  s = db->Put(WriteOptions(), "key1", "value_replaced");
-  ASSERT_TRUE(s.ok());
+  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &value).ok() && value == "value1");
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value_replaced").ok());
   std::string new_value;
-  s = db->Get(ReadOptions(), "key1", &new_value);
-  ASSERT_TRUE(s.ok() && new_value == "value_replaced");
+  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &new_value).ok() && new_value == "value_replaced");
 }
 
-std::string too_big = std::string("ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCDEFGHIJKLMNOPQRSTUVW");
-
-TEST_F(FPTreeDBTest, PutTruncatedKeyTest) {
-  Status s = db->Put(WriteOptions(), too_big, "value2");
-  ASSERT_TRUE(s.ok());
+TEST_F(FPTreeDBTest, PutLongStringsTest) {
+  std::string big = std::string("ABCDEFGHIJKLMNO QRSTUVWXYZ123:-()4567890ABCDEFGHIJKLMNO QRSTUVW");
+  ASSERT_TRUE(db->Put(WriteOptions(), big, big).ok());
   std::string value;
-  s = db->Get(ReadOptions(), too_big, &value);
-  ASSERT_TRUE(s.IsNotFound()); // because the key was truncated!
-  s = db->Get(ReadOptions(), too_big.substr(0, KEY_LENGTH), &value);
-  ASSERT_TRUE(s.ok() && value == "value2");
+  ASSERT_TRUE(db->Get(ReadOptions(), big, &value).ok() && value == big);
 }
 
-TEST_F(FPTreeDBTest, PutTruncatedValueTest) {
-  Status s = db->Put(WriteOptions(), "key3", too_big);
-  ASSERT_TRUE(s.ok());
-  std::string value;
-  s = db->Get(ReadOptions(), "key3", &value);
-  ASSERT_TRUE(s.ok() && value == too_big.substr(0, VALUE_LENGTH));
+TEST_F(FPTreeDBTest, UpdateTest) {
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "key2", "value2").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "key3", "value3").ok());
+  ASSERT_TRUE(db->Delete(WriteOptions(), "key2").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "key3", "VALUE3").ok());
+  std::string value1;
+  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &value1).ok() && value1 == "value1");
+  std::string value2;
+  ASSERT_TRUE(db->Get(ReadOptions(), "key2", &value2).IsNotFound());
+  std::string value3;
+  ASSERT_TRUE(db->Get(ReadOptions(), "key3", &value3).ok() && value3 == "VALUE3");
 }
 
 TEST_F(FPTreeDBTest, WriteTest) {
   WriteBatch batch;
   batch.Delete("key1");
   batch.Put("key2", "value2");
-  Status s = db->Write(WriteOptions(), &batch);
-  ASSERT_TRUE(s.IsNotSupported());
-  // ASSERT_TRUE(s.ok());
-  // std::string value;
-  // s = db->Get(ReadOptions(), "key1", &value);
-  // ASSERT_TRUE(s.IsNotFound());
-  // db->Get(ReadOptions(), "key2", &value);
-  // ASSERT_TRUE(value == "value");
+  ASSERT_TRUE(db->Write(WriteOptions(), &batch).IsNotSupported());
+}
+
+// =============================================================================================
+// REOPEN TESTS
+// =============================================================================================
+
+TEST_F(FPTreeDBTest, RODeleteHeadlessTest) {
+  Reopen();
+  ASSERT_TRUE(db->Delete(WriteOptions(), "nada").ok());
+}
+
+TEST_F(FPTreeDBTest, RODeleteNonexistentTest) {
+  Reopen();
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
+  ASSERT_TRUE(db->Delete(WriteOptions(), "nada").ok());
+}
+
+TEST_F(FPTreeDBTest, ROGetHeadlessTest) {
+  Reopen();
+  std::string value;
+  ASSERT_TRUE(db->Get(ReadOptions(), "waldo", &value).IsNotFound());
+}
+
+TEST_F(FPTreeDBTest, ROGetNonexistentTest) {
+  Reopen();
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
+  std::string value;
+  ASSERT_TRUE(db->Get(ReadOptions(), "waldo", &value).IsNotFound());
+}
+
+TEST_F(FPTreeDBTest, ROPutTest) {
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
+  Reopen();
+  std::string value1;
+  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &value1).ok() && value1 == "value1");
+}
+
+TEST_F(FPTreeDBTest, ROUpdateTest) {
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "key2", "value2").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "key3", "value3").ok());
+  ASSERT_TRUE(db->Delete(WriteOptions(), "key2").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "key3", "VALUE3").ok());
+  Reopen();
+  std::string value1;
+  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &value1).ok() && value1 == "value1");
+  std::string value2;
+  ASSERT_TRUE(db->Get(ReadOptions(), "key2", &value2).IsNotFound());
+  std::string value3;
+  ASSERT_TRUE(db->Get(ReadOptions(), "key3", &value3).ok() && value3 == "VALUE3");
 }

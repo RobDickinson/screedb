@@ -121,9 +121,9 @@ Status FPTreeDB::Delete(const WriteOptions& options, ColumnFamilyHandle* column_
     auto leaf = root->head;
     for (int i = 0; true; i++) {
       auto kv = leaf->keyvalues[0];
-      if (strcmp(kv->key, key.data_) == 0) {
-        LOG("Deleting key=" << kv->key << ", value=" << kv->value);
-        transaction::exec_tx(pop_, [&] { kv->key[0] = 0; });
+      if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
+        LOG("Deleting key=" << kv->key_ptr.get() << ", value=" << kv->value_ptr.get());
+        transaction::exec_tx(pop_, [&] { kv->key_ptr[0] = 0; });
       } else if (leaf->next) {
         leaf = leaf->next;
       } else break;
@@ -163,9 +163,9 @@ Status FPTreeDB::Get(const ReadOptions& options, ColumnFamilyHandle* column_fami
     auto leaf = root->head;
     for (int i = 0; true; i++) {
       auto kv = leaf->keyvalues[0];
-      if (strcmp(kv->key, key.data_) == 0) {
-        value->append(kv->value);  // todo more efficient way?
-        LOG("Get found key=" << kv->key << ", value=" << kv->value);
+      if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
+        value->append(kv->value_ptr.get());
+        LOG("Get found key=" << kv->key_ptr.get() << ", value=" << kv->value_ptr.get());
         return Status::OK();
       } else if (leaf->next) {
         leaf = leaf->next;
@@ -245,8 +245,10 @@ Status FPTreeDB::Put(const WriteOptions& options, ColumnFamilyHandle* column_fam
     head->lock = 1;
     head->keyvalues[0] = make_persistent<FPTreeDBKeyValue>();
     auto kv = head->keyvalues[0];
-    memcpy(kv->key, key.data_, key.size() <= KEY_LENGTH ? key.size() : KEY_LENGTH);
-    memcpy(kv->value, value.data_, value.size() <= VALUE_LENGTH ? value.size() : VALUE_LENGTH);
+    kv->key_ptr = make_persistent<char[]>(key.size() + 1);
+    kv->value_ptr = make_persistent<char[]>(value.size() + 1);
+    memcpy(kv->key_ptr.get(), key.data_, key.size());
+    memcpy(kv->value_ptr.get(), value.data_, value.size());
   });
   return Status::OK();
 }
@@ -390,7 +392,7 @@ void FPTreeDB::RebuildInnerNodes() {
     auto leaf = root->head;
     for (int i = 0; true; i++) {
       auto kv = leaf->keyvalues[0];
-      LOG("  leaf[" << i << "] key=" << kv->key << ", value=" << kv->value);
+      LOG("  leaf[" << i << "] key=" << kv->key_ptr.get() << ", value=" << kv->value_ptr.get());
       if (leaf->next) leaf = leaf->next; else break;
     }
   }

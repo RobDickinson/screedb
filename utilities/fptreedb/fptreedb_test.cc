@@ -37,6 +37,7 @@
 #include "gtest/gtest.h"
 
 using namespace rocksdb;
+using namespace rocksdb::fptreedb;
 
 std::string kDBPath = "/tmp/fptreedb_test";
 

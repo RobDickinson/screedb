@@ -39,6 +39,7 @@
 #define LOG(msg) std::cout << msg << "\n"
 
 using namespace rocksdb;
+using namespace rocksdb::fptreedb;
 
 std::string kDBPath = "/tmp/fptreedb_example";
 

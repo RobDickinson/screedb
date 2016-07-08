@@ -46,14 +46,6 @@
 
 #define NOOPE override { return Status::NotSupported(); }
 
-// persistent type macros for leaf nodes
-#define LEAF_BITMAP_T             p<uint8_t>
-#define LEAF_FINGERPRINT_T        p<uint8_t>
-#define LEAF_KEYS                 46
-#define LEAF_KEYVALUE_T           persistent_ptr<FPTreeDBKeyValue>
-#define LEAF_LOCK_T               p<uint8_t>
-#define LEAF_PTR_T                persistent_ptr<FPTreeDBLeaf>
-
 using nvml::obj::p;
 using nvml::obj::persistent_ptr;
 using nvml::obj::make_persistent;
@@ -72,6 +64,14 @@ struct FPTreeDBKeyValue {                           // single key/value pair
   persistent_ptr<char[]> key_ptr;                   // null-padded variable-length key
   persistent_ptr<char[]> value_ptr;                 // null-padded variable-length value
 };
+
+// persistent type macros for leaf nodes
+#define LEAF_BITMAP_T             p<uint8_t>
+#define LEAF_FINGERPRINT_T        p<uint8_t>
+#define LEAF_KEYS                 46
+#define LEAF_KEYVALUE_T           persistent_ptr<FPTreeDBKeyValue>
+#define LEAF_LOCK_T               p<uint8_t>
+#define LEAF_PTR_T                persistent_ptr<FPTreeDBLeaf>
 
 // @todo revisit field aligmnent proposal below (better for next & lock than the original?)
 // ...or is it intentional to force a cache miss when checking lock? (by having at the end)

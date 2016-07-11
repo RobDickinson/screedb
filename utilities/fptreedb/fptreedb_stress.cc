@@ -30,10 +30,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Simple example for RocksDB-style database with "Fingerprinting Persistent Tree" and NVML backend.
+// Stress test for RocksDB-style database with "Fingerprinting Persistent Tree" and NVML backend.
 // See utilities/fptreedb/fptreedb.cc for implementation.
 
 #include <iostream>
+#include <sys/time.h>
 #include "fptreedb.h"
 
 #define LOG(msg) std::cout << msg << "\n"
@@ -41,7 +42,15 @@
 using namespace rocksdb;
 using namespace rocksdb::fptreedb;
 
-std::string kDBPath = "/dev/shm/fptreedb_example";
+std::string kDBPath = "/dev/shm/fptreedb_stress";
+
+unsigned long current_millis() {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (unsigned long long) (tv.tv_sec) * 1000 + (unsigned long long) (tv.tv_usec) / 1000;
+}
+
+const unsigned long VALUES = 100000;
 
 int main() {
   LOG("Opening database");
@@ -52,29 +61,12 @@ int main() {
   Status s = FPTreeDB::Open(options, fptree_options, kDBPath, &db);
   assert(s.ok());
 
-  LOG("Putting new value");
-  s = db->Put(WriteOptions(), "key1", "value1");
-  assert(s.ok());
-  std::string value;
-  s = db->Get(ReadOptions(), "key1", &value);
-  assert(s.ok() && value == "value1");
-
-  LOG("Replacing existing value");
-  std::string value2;
-  s = db->Get(ReadOptions(), "key1", &value2);
-  assert(s.ok() && value2 == "value1");
-  s = db->Put(WriteOptions(), "key1", "value_replaced");
-  assert(s.ok());
-  std::string value3;
-  s = db->Get(ReadOptions(), "key1", &value3);
-  assert(s.ok() && value3 == "value_replaced");
-
-  LOG("Deleting existing value");
-  s = db->Delete(WriteOptions(), "key1");
-  assert(s.ok());
-  std::string value4;
-  s = db->Get(ReadOptions(), "key1", &value4);
-  assert(s.IsNotFound());
+  LOG("Putting " << VALUES << " values");
+  unsigned long started = current_millis();
+  for (int i = 0; i < VALUES; i++) {
+    s = db->Put(WriteOptions(), "ABCDEFHIJKLMNOPQ", "123456789ABCDEFG");
+  }
+  LOG("Put " << VALUES << " values in " << current_millis() - started << " ms");
 
   LOG("Closing database");
   delete db;

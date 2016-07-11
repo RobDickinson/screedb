@@ -62,7 +62,7 @@ FPTreeDB::FPTreeDB(const Options& options, const FPTreeDBOptions& dboptions,
   if (access(GetNamePtr(), F_OK) != 0) {
     LOG("Creating new persistent pool");
     pop_ = pool<FPTreeDBRoot>::create(GetNamePtr(), POBJ_LAYOUT_NAME(FPTreeDB),
-                                      PMEMOBJ_MIN_POOL, S_IRWXU);
+                                      PMEMOBJ_MIN_POOL * 64, S_IRWXU);  // todo size is hardcoded
   } else {
     pop_ = pool<FPTreeDBRoot>::open(GetNamePtr(), POBJ_LAYOUT_NAME(FPTreeDB));
   }

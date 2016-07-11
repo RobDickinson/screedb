@@ -39,7 +39,7 @@
 using namespace rocksdb;
 using namespace rocksdb::fptreedb;
 
-std::string kDBPath = "/tmp/fptreedb_test";
+std::string kDBPath = "/dev/shm/fptreedb_test";
 
 int main(int argc, char* argv[]) {
   ::testing::InitGoogleTest(&argc, argv);

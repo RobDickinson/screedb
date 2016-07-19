@@ -1,9 +1,9 @@
 ScreeDB
 =======
 
-**RocksDB Without LSM Tree or Disks/SSDs**
+**RocksDB Without LSM or Block Devices**
 
-ScreeDB is a RocksDB utility that bypasses the RocksDB LSM implementation entirely, rather than adding or optimizing memtable/table types within its LSM implementation. ScreeDB uses NVM exclusively (without mixing other types of persistent storage) and targets media sizes and latencies expected for Crystal Ridge. ScreeDB uses NVML (from pmem.io) to enable use of persistent memory and to bypass the Linux page cache and filesystem layers, which are known to incur overhead for RocksDB workloads.
+ScreeDB is a RocksDB utility that bypasses the RocksDB LSM implementation entirely, rather than adding or optimizing memtable/table types within the LSM implementation. ScreeDB uses NVM exclusively (without mixing other types of persistent storage) and targets media sizes and latencies expected for Crystal Ridge. ScreeDB uses NVML (from pmem.io) to enable use of persistent memory and to bypass the Linux page cache and filesystem layers.
 
 As a utility, ScreeDB does not modify the core RocksDB distribution, but only adds code at expected extension points. The structure of extensions for ScreeDB takes inspiration from existing SpatialDB and TransactionDB utilities, which provide high-level wrappers using the RocksDB API.
 

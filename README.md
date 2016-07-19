@@ -1,13 +1,11 @@
-FPTreeDB
-========
+ScreeDB
+=======
 
-**Fingerprinting Persistent Trees for RocksDB**
+**RocksDB Without LSM Tree or Disks/SSDs**
 
-FPTreeDB is a RocksDB utility whose name and design is inspired by the paper "FPTree: A Hybrid SCM-DRAM Persistent and Concurrent B-Tree for Storage Class Memory."
+ScreeDB is a RocksDB utility that bypasses the RocksDB LSM implementation entirely, rather than adding or optimizing memtable/table types within its LSM implementation. ScreeDB uses NVM exclusively (without mixing other types of persistent storage) and targets media sizes and latencies expected for Crystal Ridge. ScreeDB uses NVML (from pmem.io) to enable use of persistent memory and to bypass the Linux page cache and filesystem layers, which are known to incur overhead for RocksDB workloads.
 
-FPTreeDB bypasses the RocksDB LSM implementation entirely, as opposed to adding or optimizing memtable/table types within the existing LSM implementation. FPTreeDB uses NVML (see pmem.io) to also bypass the Linux page cache and filesystem, which are known to incur significant overhead for RocksDB workloads.
-
-As a utility, FPTreeDB does not modify the core RocksDB distribution, but only adds code at expected extension points. The structure of these extensions for FPTreeDB takes inspiration from existing SpatialDB and TransactionDB utilities, which provide high-level wrappers using the RocksDB API.
+As a utility, ScreeDB does not modify the core RocksDB distribution, but only adds code at expected extension points. The structure of extensions for ScreeDB takes inspiration from existing SpatialDB and TransactionDB utilities, which provide high-level wrappers using the RocksDB API.
 
 Contents
 --------
@@ -28,10 +26,10 @@ This project is based on RocksDB 4.6.1, which is a stable public release. Files 
 
 New files added:
 
--	utilities/fptreedb/fptreedb.h (FPTreeDB class header)
--	utilities/fptreedb/fptreedb.cc (FPTreeDB class implementation)
--	utilities/fptreedb/fptreedb_example.cc (small example adapted from simple_example)
--	utilities/fptreedb/fptreedb_test.cc (unit tests using Google C++ Testing Framework)
+-	utilities/screedb/screedb.h (class header)
+-	utilities/screedb/screedb.cc (class implementation)
+-	utilities/screedb/screedb_example.cc (small example adapted from simple_example)
+-	utilities/screedb/screedb_test.cc (unit tests using Google C++ Testing Framework)
 
 <a name="installation"/>
 
@@ -57,16 +55,16 @@ Get the sources:
 
 ```
 cd ~
-git clone https://github.com/RobDickinson/fptreedb.git
+git clone https://github.com/RobDickinson/screedb.git
 ```
 
 Run the tests:
 
 ```
-cd fptreedb
+cd screedb
 make static_lib -j8            # build RocksDB distribution
-cd utilities/fptreedb
-make                           # build and run FPTreeDB tests
+cd utilities/screedb
+make                           # build and run ScreeDB tests
 ```
 
 <a name="configuring_clion_project"/>
@@ -74,14 +72,14 @@ make                           # build and run FPTreeDB tests
 Configuring CLion Project
 -------------------------
 
-Obviously the use of an IDE is a personal preference -- CLion is not required for FPTreeDB development (it's not free), but it's very easy to configure if you have a valid license.
+Obviously the use of an IDE is a personal preference -- CLion is not required for ScreeDB development (it's not free), but it's very easy to configure if you have a valid license.
 
 If prompted for Toolchain configuration, choose bundled CMake.
 
 Use wizard to create project:
 
 -	From Welcome screen, select "Import Project From Sources"
--	select FPTREEDB_HOME directory
+-	select root directory
 -	select "Overwrite CMakeLists.txt"
 -	deselect all directories, then select db
 
@@ -105,7 +103,7 @@ Related Work
 
 **cpp_map**
 
-Use of NVML C++ bindings by FPTreeDB was lifted from this example program. Many thanks to Tomasz Kapela for providing a great example to follow!
+Use of NVML C++ bindings by ScreeDB was lifted from this example program. Many thanks to Tomasz Kapela for providing a great example to follow!
 
 **KV/NVM pathfinding**
 

@@ -30,9 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Header for RocksDB-style database with "Fingerprinting Persistent Tree" and NVML backend.
-// See utilities/fptreedb/fptreedb.cc for implementation.
-// See examples/fptree_example.cc for usage.
+// Header for RocksDB database using NVML backend in place of LSM tree.
 
 #pragma once
 
@@ -54,49 +52,49 @@ using nvml::obj::delete_persistent;
 using nvml::obj::pool;
 
 namespace rocksdb {
-namespace fptreedb {
+namespace screedb {
 
-struct FPTreeDBOptions {
+struct ScreeDBOptions {
   // Nothing yet
 };
 
-struct FPTreeDBKeyValue {                           // single key/value pair
+struct ScreeDBKeyValue {                            // single key/value pair
   persistent_ptr<char[]> key_ptr;                   // null-padded variable-length key
   persistent_ptr<char[]> value_ptr;                 // null-padded variable-length value
 };
 
 // persistent type macros for leaf nodes
 #define LEAF_BITMAP_T             p<uint8_t>
-#define LEAF_FINGERPRINT_T        p<uint8_t>
 #define LEAF_KEYS                 46
-#define LEAF_KEYVALUE_T           persistent_ptr<FPTreeDBKeyValue>
+#define LEAF_KEYVALUE_T           persistent_ptr<ScreeDBKeyValue>
 #define LEAF_LOCK_T               p<uint8_t>
-#define LEAF_PTR_T                persistent_ptr<FPTreeDBLeaf>
+#define LEAF_PTR_T                persistent_ptr<ScreeDBLeaf>
+#define LEAF_VALUEHASH_T          p<uint8_t>
 
-// @todo revisit field aligmnent proposal below (better for next & lock than the original?)
-// ...or is it intentional to force a cache miss when checking lock? (by having at the end)
-struct FPTreeDBLeaf {
+// @todo revisit field aligmnent proposal below
+// is it helpful to force a cache miss when checking lock by relocating to end?
+struct ScreeDBLeaf {
   LEAF_PTR_T next;                                  // 16 bytes, points to next leaf
   LEAF_BITMAP_T bitmap;                             // 1 byte, tracks allocated keys
   LEAF_LOCK_T lock;                                 // 1 byte, boolean lock
-  LEAF_FINGERPRINT_T fingerprints[LEAF_KEYS];       // 46 bytes, rest of cache line
+  LEAF_VALUEHASH_T hashes[LEAF_KEYS];               // 46 bytes, rest of cache line
   LEAF_KEYVALUE_T keyvalues[LEAF_KEYS];             // contained key/value pairs
 };
 
-struct FPTreeDBRoot {
+struct ScreeDBRoot {
   p<uint64_t> opened;                               // number of times opened
   p<uint64_t> closed;                               // number of times closed safely
   LEAF_PTR_T head;                                  // head leaf node
 };
 
-class FPTreeDB : public DB {
+class ScreeDB : public DB {
 public:
   // Open database using specified configuration options and name.
-  static Status Open(const Options& options, const FPTreeDBOptions& dboptions,
-                     const std::string& dbname, FPTreeDB** dbptr);
+  static Status Open(const Options& options, const ScreeDBOptions& dboptions,
+                     const std::string& dbname, ScreeDB** dbptr);
 
   // Safely close the database.
-  virtual ~FPTreeDB();
+  virtual ~ScreeDB();
 
   // =============================================================================================
   // KEY/VALUE METHODS
@@ -462,30 +460,26 @@ public:
 
 protected:
   // Hide constructor, call Open() to create instead
-  FPTreeDB(const Options& options, const FPTreeDBOptions& dboptions, const std::string& dbname);
+  ScreeDB(const Options& options, const ScreeDBOptions& dboptions, const std::string& dbname);
 
   // Leaf methods
   void DeleteLeaf();
   void FindLeaf(const Slice& key);
-  void FindLeafAndPrevLeaf(const Slice& key);
   void SplitLeaf();
 
-  // Recovery methods
+  // Lifecycle methods
   void Recover();
-  void RecoverDelete();
-  void RecoverSplit();
   void RebuildInnerNodes();
-  void RebuildLogQueues();
   void Shutdown();
 
 private:
   const std::string dbname_;        // Name when constructed
   const DBOptions dboptions_;       // Options when constructed
-  pool<FPTreeDBRoot> pop_;          // Persistent pool for root
+  pool<ScreeDBRoot> pop_;           // Persistent pool for root
 
-  FPTreeDB(const FPTreeDB&);        // Prevent copying
-  void operator=(const FPTreeDB&);  // Prevent assignment
+  ScreeDB(const ScreeDB&);          // Prevent copying
+  void operator=(const ScreeDB&);   // Prevent assignment
 };
 
-} // namespace fptreedb
+} // namespace screedb
 } // namespace rocksdb

@@ -30,26 +30,25 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Simple example for RocksDB-style database with "Fingerprinting Persistent Tree" and NVML backend.
-// See utilities/fptreedb/fptreedb.cc for implementation.
+// Simple example for RocksDB database using NVML backend in place of LSM tree.
 
 #include <iostream>
-#include "fptreedb.h"
+#include "screedb.h"
 
 #define LOG(msg) std::cout << msg << "\n"
 
 using namespace rocksdb;
-using namespace rocksdb::fptreedb;
+using namespace rocksdb::screedb;
 
-std::string kDBPath = "/dev/shm/fptreedb_example";
+std::string kDBPath = "/dev/shm/screedb_example";
 
 int main() {
   LOG("Opening database");
   Options options;
   options.create_if_missing = true;  // todo option is ignored, see #7
-  FPTreeDBOptions fptree_options;
-  FPTreeDB* db;
-  Status s = FPTreeDB::Open(options, fptree_options, kDBPath, &db);
+  ScreeDBOptions db_options;
+  ScreeDB* db;
+  Status s = ScreeDB::Open(options, db_options, kDBPath, &db);
   assert(s.ok());
 
   LOG("Putting new value");

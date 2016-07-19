@@ -30,19 +30,18 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Stress test for RocksDB-style database with "Fingerprinting Persistent Tree" and NVML backend.
-// See utilities/fptreedb/fptreedb.cc for implementation.
+// Stress test for RocksDB database using NVML backend in place of LSM tree.
 
 #include <iostream>
 #include <sys/time.h>
-#include "fptreedb.h"
+#include "screedb.h"
 
 #define LOG(msg) std::cout << msg << "\n"
 
 using namespace rocksdb;
-using namespace rocksdb::fptreedb;
+using namespace rocksdb::screedb;
 
-std::string kDBPath = "/dev/shm/fptreedb_stress";
+std::string kDBPath = "/dev/shm/screedb_stress";
 
 unsigned long current_millis() {
   struct timeval tv;
@@ -56,9 +55,9 @@ int main() {
   LOG("Opening database");
   Options options;
   options.create_if_missing = true;  // todo option is ignored, see #7
-  FPTreeDBOptions fptree_options;
-  FPTreeDB* db;
-  Status s = FPTreeDB::Open(options, fptree_options, kDBPath, &db);
+  ScreeDBOptions db_options;
+  ScreeDB* db;
+  Status s = ScreeDB::Open(options, db_options, kDBPath, &db);
   assert(s.ok());
 
   LOG("Putting " << VALUES << " values");

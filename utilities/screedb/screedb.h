@@ -35,11 +35,11 @@
 #pragma once
 
 #include <string>
-#include <libpmemobj/make_persistent.hpp>
-#include <libpmemobj/make_persistent_array.hpp>
-#include <libpmemobj/persistent_ptr.hpp>
-#include <libpmemobj/pool.hpp>
-#include <libpmemobj/transaction.hpp>
+#include <libpmemobj++/make_persistent.hpp>
+#include <libpmemobj++/make_persistent_array.hpp>
+#include <libpmemobj++/persistent_ptr.hpp>
+#include <libpmemobj++/pool.hpp>
+#include <libpmemobj++/transaction.hpp>
 #include "rocksdb/db.h"
 
 #define NOOPE override { return Status::NotSupported(); }

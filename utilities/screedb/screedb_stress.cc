@@ -49,7 +49,9 @@ unsigned long current_millis() {
   return (unsigned long long) (tv.tv_sec) * 1000 + (unsigned long long) (tv.tv_usec) / 1000;
 }
 
-const unsigned long VALUES = 100000;
+const unsigned long GET_VALUES = 100;
+const unsigned long PUT_VALUES = 100000;
+const std::string VALUE = "123456789ABCDEFG";
 
 int main() {
   LOG("Opening database");
@@ -60,12 +62,28 @@ int main() {
   Status s = ScreeDB::Open(options, db_options, kDBPath, &db);
   assert(s.ok());
 
-  LOG("Putting " << VALUES << " values");
+  LOG("Putting " << PUT_VALUES << " values");
   unsigned long started = current_millis();
-  for (int i = 0; i < VALUES; i++) {
-    s = db->Put(WriteOptions(), "ABCDEFHIJKLMNOPQ", "123456789ABCDEFG");
+  for (int i = 0; i < PUT_VALUES; i++) {
+    s = db->Put(WriteOptions(), std::to_string(i), VALUE);
+    assert(s.ok());
   }
-  LOG("Put " << VALUES << " values in " << current_millis() - started << " ms");
+  LOG("Put " << PUT_VALUES << " values in " << current_millis() - started << " ms");
+
+  LOG("Getting oldest " << GET_VALUES << " values");
+  started = current_millis();
+  for (int i = 0; i < GET_VALUES; i++) {
+    std::string value;
+    assert(db->Get(ReadOptions(), std::to_string(i), &value).ok());
+  }
+  LOG("Got oldest " << GET_VALUES << " values in " << current_millis() - started << " ms");
+
+  LOG("Deleting oldest " << GET_VALUES << " values");
+  started = current_millis();
+  for (int i = 0; i < GET_VALUES; i++) {
+    assert(db->Delete(WriteOptions(), std::to_string(i)).ok());
+  }
+  LOG("Deleted oldest " << GET_VALUES << " values in " << current_millis() - started << " ms");
 
   LOG("Closing database");
   delete db;

@@ -75,6 +75,14 @@ private:
 // SINGLE-OPEN TESTS
 // =============================================================================================
 
+TEST_F(ScreeDBTest, SizeofTest) {
+  ASSERT_TRUE(sizeof(ScreeDBRoot) == 32);
+  ASSERT_TRUE(sizeof(ScreeDBLeaf) == 744);
+  ASSERT_TRUE(sizeof_field(ScreeDBLeaf, next) + sizeof_field(ScreeDBLeaf, bitmaps)
+              + sizeof_field(ScreeDBLeaf, hashes) == 64);  // one cache line
+  ASSERT_TRUE(sizeof(ScreeDBKeyValue) == 32);
+}
+
 TEST_F(ScreeDBTest, DeleteAllTest) {
   ASSERT_TRUE(db->Put(WriteOptions(), "tmpkey", "tmpvalue1").ok());
   ASSERT_TRUE(db->Delete(WriteOptions(), "tmpkey").ok());

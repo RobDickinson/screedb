@@ -43,6 +43,7 @@
 #include "rocksdb/db.h"
 
 #define NOOPE override { return Status::NotSupported(); }
+#define sizeof_field(type, field) sizeof(((type *)0)->field)
 
 using nvml::obj::p;
 using nvml::obj::persistent_ptr;
@@ -64,21 +65,20 @@ struct ScreeDBKeyValue {                            // single key/value pair
 };
 
 // persistent type macros for leaf nodes
+#define LEAF_BITMAPS              6
 #define LEAF_BITMAP_T             p<uint8_t>
-#define LEAF_KEYS                 46
+#define LEAF_KEYS                 42
 #define LEAF_KEYVALUE_T           persistent_ptr<ScreeDBKeyValue>
 #define LEAF_LOCK_T               p<uint8_t>
 #define LEAF_PTR_T                persistent_ptr<ScreeDBLeaf>
 #define LEAF_VALUEHASH_T          p<uint8_t>
 
-// @todo revisit field aligmnent proposal below
-// is it helpful to force a cache miss when checking lock by relocating to end?
 struct ScreeDBLeaf {
   LEAF_PTR_T next;                                  // 16 bytes, points to next leaf
-  LEAF_BITMAP_T bitmap;                             // 1 byte, tracks allocated keys
-  LEAF_LOCK_T lock;                                 // 1 byte, boolean lock
-  LEAF_VALUEHASH_T hashes[LEAF_KEYS];               // 46 bytes, rest of cache line
+  LEAF_BITMAP_T bitmaps[LEAF_BITMAPS];              // 6 bytes, highest 6 bits are unused
+  LEAF_VALUEHASH_T hashes[LEAF_KEYS];               // 42 bytes, rest of cache line
   LEAF_KEYVALUE_T keyvalues[LEAF_KEYS];             // contained key/value pairs
+  LEAF_LOCK_T lock;                                 // boolean lock
 };
 
 struct ScreeDBRoot {
@@ -216,7 +216,7 @@ public:
   virtual const Snapshot* GetSnapshot() override { return nullptr; }
 
   // Release a previously acquired snapshot.  The caller must not use snapshot after this call.
-  virtual void ReleaseSnapshot(const Snapshot* snapshot) override { }
+  virtual void ReleaseSnapshot(const Snapshot* snapshot) override {}
 
   // =============================================================================================
   // COLUMN FAMILY METHODS
@@ -239,7 +239,7 @@ public:
   // If cf_name is not specified, then the metadata of the default column family will be returned.
   using DB::GetColumnFamilyMetaData;
   virtual void GetColumnFamilyMetaData(ColumnFamilyHandle* column_family,
-                                       ColumnFamilyMetaData* metadata) override { }
+                                       ColumnFamilyMetaData* metadata) override {}
 
   // =============================================================================================
   // PROPERTY METHODS
@@ -419,7 +419,7 @@ public:
   using DB::GetApproximateSizes;
   virtual void GetApproximateSizes(ColumnFamilyHandle* column_family,
                                    const Range* range, int n, uint64_t* sizes,
-                                   bool include_memtable = false) override { }
+                                   bool include_memtable = false) override {}
 
   // Retrieve the list of all files in the database. The files are relative to the dbname and
   // are not absolute paths. The valid size of the manifest file is returned in
@@ -435,7 +435,7 @@ public:
                               bool flush_memtable = true) NOOPE;
 
   // Returns a list of all table files with their level, start key and end key.
-  virtual void GetLiveFilesMetaData(std::vector<LiveFileMetaData>*) override { }
+  virtual void GetLiveFilesMetaData(std::vector<LiveFileMetaData>*) override {}
 
   // Returns generic properties for tables in use.
   using DB::GetPropertiesOfAllTables;

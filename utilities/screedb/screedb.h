@@ -463,9 +463,10 @@ protected:
   ScreeDB(const Options& options, const ScreeDBOptions& dboptions, const std::string& dbname);
 
   // Leaf methods
-  void DeleteLeaf();
-  void FindLeaf(const Slice& key);
-  void SplitLeaf();
+  void KeyValueFill(const LEAF_KEYVALUE_T kv, const Slice& key, const Slice& value);
+  void LeafDelete();
+  void LeafFind(const Slice& key);
+  void LeafSplit();
 
   // Lifecycle methods
   void Recover();

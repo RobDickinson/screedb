@@ -88,18 +88,31 @@ Status ScreeDB::Delete(const WriteOptions& options, ColumnFamilyHandle* column_f
   LOG("Delete key=" << key.data_);
   auto root = pop_.get_root();
   if (!root->head) {
-    LOG("Delete skipped, head not present");
+    LOG("   head not present");
     return Status::OK();
   } else {
     auto leaf = root->head;
-    for (int i = 0; true; i++) {
-      auto kv = leaf->keyvalues[0];
-      if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
-        LOG("Deleting key=" << kv->key_ptr.get() << ", value=" << kv->value_ptr.get());
-        transaction::exec_tx(pop_, [&] { kv->key_ptr[0] = 0; });
-      } else if (leaf->next) {
+    while (true) {  // todo unbounded loop
+      for (int i = 0; i < LEAF_KEYS; i++) {
+        int bmindex = i / 8;
+        int bmslot = i % 8;
+        if ((leaf->bitmaps[bmindex] >> bmslot) & 1) {
+          // todo check against hashes before reading the keyvalues array
+          auto kv = leaf->keyvalues[i];
+          if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
+            LOG("   updating slot, bmindex=" << bmindex << ", bmslot=" << bmslot);
+            transaction::exec_tx(pop_, [&] {
+              kv->key_ptr[0] = 0;  // todo not reclaiming allocated key/value storage
+            });
+          }
+        }
+      }
+      if (leaf->next) {
         leaf = leaf->next;
-      } else break;
+      } else {
+        LOG("   could not find key");
+        break;
+      }
     }
   }
   return Status::OK();
@@ -113,20 +126,29 @@ Status ScreeDB::Get(const ReadOptions& options, ColumnFamilyHandle* column_famil
   LOG("Get key=" << key.data_);
   auto root = pop_.get_root();
   if (!root->head) {
-    LOG("Get not found, head not present");
+    LOG("   head not present");
     return Status::NotFound();
   } else {
     auto leaf = root->head;
-    for (int i = 0; true; i++) {
-      auto kv = leaf->keyvalues[0];
-      if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
-        value->append(kv->value_ptr.get());
-        LOG("Get found key=" << kv->key_ptr.get() << ", value=" << kv->value_ptr.get());
-        return Status::OK();
-      } else if (leaf->next) {
+    while (true) {  // todo unbounded loop
+      for (int i = (LEAF_KEYS - 1); i >= 0; i--) {  // reverse order to read most recent writes
+        int bmindex = i / 8;
+        int bmslot = i % 8;
+        if ((leaf->bitmaps[bmindex] >> bmslot) & 1) {
+          // todo check against hashes before reading the keyvalues array
+          auto kv = leaf->keyvalues[i];
+          if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
+            value->append(kv->value_ptr.get());
+            LOG("   found value=" << kv->value_ptr.get() << ", bmindex=" << bmindex
+                                  << ", bmslot=" << bmslot);
+            return Status::OK();
+          }
+        }
+      }
+      if (leaf->next) {
         leaf = leaf->next;
       } else {
-        LOG("Get not found for key=" << key.data_);
+        LOG("   could not find key");
         return Status::NotFound();
       }
     }
@@ -162,21 +184,34 @@ Status ScreeDB::Put(const WriteOptions& options, ColumnFamilyHandle* column_fami
                     const Slice& key, const Slice& value) {
   LOG("Put key=" << key.data_ << ", value=" << value.data_);
   auto root = pop_.get_root();
+
+  // attempt to add to head leaf first
+  if (root->head) {
+    auto leaf = root->head;
+    for (int i = 0; i < LEAF_KEYS; i++) {
+      int bmindex = i / 8;
+      int bmslot = i % 8;
+      if ((leaf->bitmaps[bmindex] >> bmslot) & 1) continue;
+      LOG("   updating head slot, bmindex=" << bmindex << ", bmslot=" << bmslot);
+      transaction::exec_tx(pop_, [&] {
+        leaf->bitmaps[bmindex] = leaf->bitmaps[bmindex] ^ (1 << bmslot);
+        leaf->keyvalues[i] = make_persistent<ScreeDBKeyValue>();
+        KeyValueFill(leaf->keyvalues[i], key, value);
+      });
+      return Status::OK();
+    }
+  }
+
+  // add new leaf in head position
+  LOG("   adding new leaf");
+  auto old_head = root->head;
   transaction::exec_tx(pop_, [&] {
-    // add new leaf in head position
-    auto old_head = root->head;
     root->head = make_persistent<ScreeDBLeaf>();
     auto head = root->head;
     head->next = old_head;
-
-    // use only the first keyvalue slot in the leaf
-    head->lock = 1;
+    head->bitmaps[0] = 1;
     head->keyvalues[0] = make_persistent<ScreeDBKeyValue>();
-    auto kv = head->keyvalues[0];
-    kv->key_ptr = make_persistent<char[]>(key.size() + 1);
-    kv->value_ptr = make_persistent<char[]>(value.size() + 1);
-    memcpy(kv->key_ptr.get(), key.data_, key.size());
-    memcpy(kv->value_ptr.get(), value.data_, value.size());
+    KeyValueFill(head->keyvalues[0], key, value);
   });
   return Status::OK();
 }
@@ -185,15 +220,22 @@ Status ScreeDB::Put(const WriteOptions& options, ColumnFamilyHandle* column_fami
 // PROTECTED LEAF METHODS
 // ===============================================================================================
 
-void ScreeDB::DeleteLeaf() {
+void ScreeDB::KeyValueFill(const LEAF_KEYVALUE_T kv, const Slice& key, const Slice& value) {
+  kv->key_ptr = make_persistent<char[]>(key.size() + 1);
+  kv->value_ptr = make_persistent<char[]>(value.size() + 1);
+  memcpy(kv->key_ptr.get(), key.data_, key.size());
+  memcpy(kv->value_ptr.get(), value.data_, value.size());
+}
+
+void ScreeDB::LeafDelete() {
 
 }
 
-void ScreeDB::FindLeaf(const Slice& key) {
+void ScreeDB::LeafFind(const Slice& key) {
 
 }
 
-void ScreeDB::SplitLeaf() {
+void ScreeDB::LeafSplit() {
 
 }
 
@@ -208,13 +250,13 @@ void ScreeDB::Recover() {
   // @todo handle opened/closed inequality, including count correction
   auto root = pop_.get_root();
   if (!root->head) {
-    LOG("Creating root");
+    LOG("   creating root");
     transaction::exec_tx(pop_, [&] {
       root->opened = 1;
       root->closed = 0;
     });
   } else {
-    LOG("Recovering head: opened=" << root->opened << ", closed=" << root->closed);
+    LOG("   recovering head: opened=" << root->opened << ", closed=" << root->closed);
     transaction::exec_tx(pop_, [&] { root->opened = root->opened + 1; });
   }
 
@@ -229,7 +271,7 @@ void ScreeDB::RebuildInnerNodes() {
     auto leaf = root->head;
     for (int i = 0; true; i++) {
       auto kv = leaf->keyvalues[0];
-      LOG("  leaf[" << i << "] key=" << kv->key_ptr.get() << ", value=" << kv->value_ptr.get());
+      LOG("   leaf[" << i << "] key=" << kv->key_ptr.get() << ", value=" << kv->value_ptr.get());
       if (leaf->next) leaf = leaf->next; else break;
     }
   }

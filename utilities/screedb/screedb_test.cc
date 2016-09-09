@@ -86,7 +86,6 @@ TEST_F(ScreeDBTest, SizeofTest) {
 TEST_F(ScreeDBTest, DeleteAllTest) {
   ASSERT_TRUE(db->Put(WriteOptions(), "tmpkey", "tmpvalue1").ok());
   ASSERT_TRUE(db->Delete(WriteOptions(), "tmpkey").ok());
-  // @todo additional verification for newly empty db
   ASSERT_TRUE(db->Put(WriteOptions(), "tmpkey1", "tmpvalue1").ok());
   std::string value;
   ASSERT_TRUE(db->Get(ReadOptions(), "tmpkey1", &value).ok() && value == "tmpvalue1");
@@ -116,13 +115,22 @@ TEST_F(ScreeDBTest, GetHeadlessTest) {
   ASSERT_TRUE(db->Get(ReadOptions(), "waldo", &value).IsNotFound());
 }
 
+TEST_F(ScreeDBTest, GetMultipleLeavesTest) {
+  for (int i = 0; i < 256; i++) {
+    std::string istr = std::to_string(i);
+    assert(db->Put(WriteOptions(), istr, istr).ok());
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
+  }
+}
+
 TEST_F(ScreeDBTest, GetNonexistentTest) {
   ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
   std::string value;
   ASSERT_TRUE(db->Get(ReadOptions(), "waldo", &value).IsNotFound());
 }
 
-TEST_F(ScreeDBTest, GetOneOfManyTest) {
+TEST_F(ScreeDBTest, GetSingleLeafTest) {
   ASSERT_TRUE(db->Put(WriteOptions(), "abc", "A1").ok());
   ASSERT_TRUE(db->Put(WriteOptions(), "def", "B2").ok());
   ASSERT_TRUE(db->Put(WriteOptions(), "hij", "C3").ok());
@@ -222,11 +230,46 @@ TEST_F(ScreeDBTest, ROGetHeadlessTest) {
   ASSERT_TRUE(db->Get(ReadOptions(), "waldo", &value).IsNotFound());
 }
 
+TEST_F(ScreeDBTest, ROGetMultipleLeavesTest) {
+  for (int i = 0; i < 128; i++) {
+    std::string istr = std::to_string(i);
+    assert(db->Put(WriteOptions(), istr, istr).ok());
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
+  }
+  Reopen();
+  for (int i = 0; i < 256; i++) {
+    std::string istr = std::to_string(i);
+    assert(db->Put(WriteOptions(), istr, istr + "!").ok());
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == (istr + "!"));
+  }
+}
+
 TEST_F(ScreeDBTest, ROGetNonexistentTest) {
   Reopen();
   ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
   std::string value;
   ASSERT_TRUE(db->Get(ReadOptions(), "waldo", &value).IsNotFound());
+}
+
+TEST_F(ScreeDBTest, ROGetSingleLeafTest) {
+  ASSERT_TRUE(db->Put(WriteOptions(), "abc", "A1").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "def", "B2").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "hij", "C3").ok());
+  Reopen();
+  ASSERT_TRUE(db->Put(WriteOptions(), "jkl", "D4").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "mno", "E5").ok());
+  std::string value1;
+  ASSERT_TRUE(db->Get(ReadOptions(), "abc", &value1).ok() && value1 == "A1");
+  std::string value2;
+  ASSERT_TRUE(db->Get(ReadOptions(), "def", &value2).ok() && value2 == "B2");
+  std::string value3;
+  ASSERT_TRUE(db->Get(ReadOptions(), "hij", &value3).ok() && value3 == "C3");
+  std::string value4;
+  ASSERT_TRUE(db->Get(ReadOptions(), "jkl", &value4).ok() && value4 == "D4");
+  std::string value5;
+  ASSERT_TRUE(db->Get(ReadOptions(), "mno", &value5).ok() && value5 == "E5");
 }
 
 TEST_F(ScreeDBTest, ROPutTest) {

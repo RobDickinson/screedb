@@ -59,14 +59,12 @@ int main() {
   options.create_if_missing = true;  // todo option is ignored, see #7
   ScreeDBOptions db_options;
   ScreeDB* db;
-  Status s = ScreeDB::Open(options, db_options, kDBPath, &db);
-  assert(s.ok());
+  assert(ScreeDB::Open(options, db_options, kDBPath, &db).ok());
 
   LOG("Putting " << PUT_VALUES << " values");
   unsigned long started = current_millis();
   for (int i = 0; i < PUT_VALUES; i++) {
-    s = db->Put(WriteOptions(), std::to_string(i), VALUE);
-    assert(s.ok());
+    assert(db->Put(WriteOptions(), std::to_string(i), VALUE).ok());
   }
   LOG("Put " << PUT_VALUES << " values in " << current_millis() - started << " ms");
 
@@ -74,7 +72,7 @@ int main() {
   started = current_millis();
   for (int i = 0; i < GET_VALUES; i++) {
     std::string value;
-    assert(db->Get(ReadOptions(), std::to_string(i), &value).ok());
+    assert(db->Get(ReadOptions(), std::to_string(i), &value).ok() && value == VALUE);
   }
   LOG("Got oldest " << GET_VALUES << " values in " << current_millis() - started << " ms");
 

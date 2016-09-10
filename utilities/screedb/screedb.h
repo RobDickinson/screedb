@@ -463,8 +463,9 @@ protected:
   ScreeDB(const Options& options, const ScreeDBOptions& dboptions, const std::string& dbname);
 
   // Leaf methods
-  void KeyValueFill(const LEAF_KEYVALUE_T kv, const Slice& key, const Slice& value);
   void LeafDelete();
+  void LeafFillSlot(const LEAF_PTR_T leaf, const int slot, const int bmindex, const int bmslot,
+                    const Slice& key, const Slice& value);
   void LeafFind(const Slice& key);
   void LeafSplit();
 
@@ -472,6 +473,9 @@ protected:
   void Recover();
   void RebuildInnerNodes();
   void Shutdown();
+
+  // Helper methods
+  uint8_t PearsonHash(const char* data);
 
 private:
   const std::string dbname_;        // Name when constructed

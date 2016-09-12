@@ -65,9 +65,7 @@ struct ScreeDBKeyValue {                            // single key/value pair
 };
 
 // persistent type macros for leaf nodes
-#define LEAF_BITMAPS              6
-#define LEAF_BITMAP_T             p<uint8_t>
-#define LEAF_KEYS                 42
+#define LEAF_KEYS                 48
 #define LEAF_KEYVALUE_T           persistent_ptr<ScreeDBKeyValue>
 #define LEAF_LOCK_T               p<uint8_t>
 #define LEAF_PTR_T                persistent_ptr<ScreeDBLeaf>
@@ -75,8 +73,7 @@ struct ScreeDBKeyValue {                            // single key/value pair
 
 struct ScreeDBLeaf {
   LEAF_PTR_T next;                                  // 16 bytes, points to next leaf
-  LEAF_BITMAP_T bitmaps[LEAF_BITMAPS];              // 6 bytes, highest 6 bits are unused
-  LEAF_VALUEHASH_T hashes[LEAF_KEYS];               // 42 bytes, rest of cache line
+  LEAF_VALUEHASH_T hashes[LEAF_KEYS];               // 48 bytes, rest of cache line
   LEAF_KEYVALUE_T keyvalues[LEAF_KEYS];             // contained key/value pairs
   LEAF_LOCK_T lock;                                 // boolean lock
 };
@@ -464,8 +461,7 @@ protected:
 
   // Leaf methods
   void LeafDelete();
-  void LeafFillSlot(const LEAF_PTR_T leaf, const int slot, const int bmindex, const int bmslot,
-                    const Slice& key, const Slice& value);
+  void LeafFillSlot(const LEAF_PTR_T leaf, const int slot, const Slice& key, const Slice& value);
   void LeafFind(const Slice& key);
   void LeafSplit();
 

@@ -94,13 +94,11 @@ Status ScreeDB::Delete(const WriteOptions& options, ColumnFamilyHandle* column_f
     const uint8_t hash = PearsonHash(key.data_);
     auto leaf = root->head;
     while (true) {  // todo unbounded loop
-      for (int i = 0; i < LEAF_KEYS; i++) {
-        int bmindex = i / 8;
-        int bmslot = i % 8;
-        if ((leaf->hashes[i] == hash) && ((leaf->bitmaps[bmindex] >> bmslot) & 1)) {
-          auto kv = leaf->keyvalues[i];
+      for (int slot = 0; slot < LEAF_KEYS; slot++) {
+        if (leaf->hashes[slot] == hash) {
+          auto kv = leaf->keyvalues[slot];
           if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
-            LOG("   updating slot, bmindex=" << bmindex << ", bmslot=" << bmslot);
+            LOG("   updating slot=" << slot);
             transaction::exec_tx(pop_, [&] {
               kv->key_ptr[0] = 0;  // todo not reclaiming allocated key/value storage
             });
@@ -132,15 +130,12 @@ Status ScreeDB::Get(const ReadOptions& options, ColumnFamilyHandle* column_famil
     const uint8_t hash = PearsonHash(key.data_);
     auto leaf = root->head;
     while (true) {  // todo unbounded loop
-      for (int i = (LEAF_KEYS - 1); i >= 0; i--) {  // reverse order to read most recent writes
-        int bmindex = i / 8;
-        int bmslot = i % 8;
-        if ((leaf->hashes[i] == hash) && ((leaf->bitmaps[bmindex] >> bmslot) & 1)) {
-          auto kv = leaf->keyvalues[i];
+      for (int slot = (LEAF_KEYS - 1); slot >= 0; slot--) {  // reverse scan for most recent
+        if (leaf->hashes[slot] == hash) {
+          auto kv = leaf->keyvalues[slot];
           if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
             value->append(kv->value_ptr.get());
-            LOG("   found value=" << kv->value_ptr.get() << ", bmindex=" << bmindex
-                                  << ", bmslot=" << bmslot);
+            LOG("   found value=" << kv->value_ptr.get() << ", slot=" << slot);
             return Status::OK();
           }
         }
@@ -188,13 +183,11 @@ Status ScreeDB::Put(const WriteOptions& options, ColumnFamilyHandle* column_fami
 
   // attempt to add to head leaf first
   if (leaf) {
-    for (int i = 0; i < LEAF_KEYS; i++) {
-      int bmindex = i / 8;
-      int bmslot = i % 8;
-      if ((leaf->bitmaps[bmindex] >> bmslot) & 1) continue;
-      LOG("   updating head slot, bmindex=" << bmindex << ", bmslot=" << bmslot);
+    for (int slot = 0; slot < LEAF_KEYS; slot++) {
+      if (leaf->hashes[slot] != 0) continue;
+      LOG("   updating slot=" << slot);
       transaction::exec_tx(pop_, [&] {
-        LeafFillSlot(leaf, i, bmindex, bmslot, key, value);
+        LeafFillSlot(leaf, slot, key, value);
       });
       return Status::OK();
     }
@@ -205,7 +198,7 @@ Status ScreeDB::Put(const WriteOptions& options, ColumnFamilyHandle* column_fami
   transaction::exec_tx(pop_, [&] {
     root->head = make_persistent<ScreeDBLeaf>();
     root->head->next = leaf;
-    LeafFillSlot(root->head, 0, 0, 0, key, value);
+    LeafFillSlot(root->head, 0, key, value);
   });
   return Status::OK();
 }
@@ -218,9 +211,8 @@ void ScreeDB::LeafDelete() {
 
 }
 
-void ScreeDB::LeafFillSlot(const LEAF_PTR_T leaf, const int slot, const int bmindex,
-                           const int bmslot, const Slice& key, const Slice& value) {
-  leaf->bitmaps[bmindex] = leaf->bitmaps[bmindex] ^ (1 << bmslot);     // toggle bitmap slot bit
+void ScreeDB::LeafFillSlot(const LEAF_PTR_T leaf, const int slot, const Slice& key,
+                           const Slice& value) {
   leaf->hashes[slot] = PearsonHash(key.data_);                         // calculate & store hash
   leaf->keyvalues[slot] = make_persistent<ScreeDBKeyValue>();          // make key/value object
   auto kv = leaf->keyvalues[slot];
@@ -309,13 +301,18 @@ const uint8_t PEARSON_LOOKUP_TABLE[256] = {
         149, 80, 170, 68, 6, 169, 234, 151
 };
 
-// Pearson hashing algorithm from RFC 3074
+// Modified Pearson hashing algorithm from RFC 3074
 uint8_t ScreeDB::PearsonHash(const char* data) {
   size_t len = strlen(data);
   uint8_t hash = (uint8_t) len;
-  for (size_t i = len; i > 0;) {
+  for (size_t i = len; i > 0;) {  // todo first n chars instead?
     hash = PEARSON_LOOKUP_TABLE[hash ^ data[--i]];
   }
+
+  // MODIFICATION START
+  if (hash == 0) hash = 1;  // never return 0, this is reserved for "null"
+  // MODIFICATION END
+
   return hash;
 }
 

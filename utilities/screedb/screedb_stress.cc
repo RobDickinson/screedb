@@ -41,7 +41,9 @@
 using namespace rocksdb;
 using namespace rocksdb::screedb;
 
-std::string kDBPath = "/dev/shm/screedb_stress";
+const std::string DB_PATH = "/dev/shm/screedb_stress";
+const std::string VALUE = "A";
+const unsigned long VALUES = 1000000;
 
 unsigned long current_millis() {
   struct timeval tv;
@@ -49,8 +51,27 @@ unsigned long current_millis() {
   return (unsigned long long) (tv.tv_sec) * 1000 + (unsigned long long) (tv.tv_usec) / 1000;
 }
 
-const unsigned long VALUES = 1000000;
-const std::string VALUE = "A";
+void testDelete(ScreeDB* db) {
+  LOG("Deleting " << VALUES << " values");
+  auto started = current_millis();
+  for (int i = 0; i < VALUES; i++) assert(db->Delete(WriteOptions(), std::to_string(i)).ok());
+  LOG("      in " << current_millis() - started << " ms");
+}
+
+void testGet(ScreeDB* db) {
+  LOG("Getting " << VALUES << " values");
+  auto started = current_millis();
+  std::string value;
+  for (int i = 0; i < VALUES; i++) assert(db->Get(ReadOptions(), std::to_string(i), &value).ok());
+  LOG("     in " << current_millis() - started << " ms");
+}
+
+void testPut(ScreeDB* db) {
+  LOG("Putting " << VALUES << " values");
+  auto started = current_millis();
+  for (int i = 0; i < VALUES; i++) assert(db->Put(WriteOptions(), std::to_string(i), VALUE).ok());
+  LOG("     in " << current_millis() - started << " ms");
+}
 
 int main() {
   LOG("Opening database");
@@ -58,23 +79,14 @@ int main() {
   options.create_if_missing = true;  // todo option is ignored, see #7
   ScreeDBOptions db_options;
   ScreeDB* db;
-  assert(ScreeDB::Open(options, db_options, kDBPath, &db).ok());
+  assert(ScreeDB::Open(options, db_options, DB_PATH, &db).ok());
 
-  LOG("Putting " << VALUES << " values");
-  unsigned long started = current_millis();
-  for (int i = 0; i < VALUES; i++) assert(db->Put(WriteOptions(), std::to_string(i), VALUE).ok());
-  LOG("     in " << current_millis() - started << " ms");
-
-  LOG("Getting " << VALUES << " values");
-  started = current_millis();
-  std::string value;
-  for (int i = 0; i < VALUES; i++) assert(db->Get(ReadOptions(), std::to_string(i), &value).ok());
-  LOG("     in " << current_millis() - started << " ms");
-
-  LOG("Deleting " << VALUES << " values");
-  started = current_millis();
-  for (int i = 0; i < VALUES; i++) assert(db->Delete(WriteOptions(), std::to_string(i)).ok());
-  LOG("      in " << current_millis() - started << " ms");
+  // run some tests
+  testPut(db);
+  testGet(db);
+  testDelete(db);
+  testPut(db);
+  testGet(db);
 
   LOG("Closing database");
   delete db;

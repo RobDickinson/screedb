@@ -49,9 +49,8 @@ unsigned long current_millis() {
   return (unsigned long long) (tv.tv_sec) * 1000 + (unsigned long long) (tv.tv_usec) / 1000;
 }
 
-const unsigned long GET_VALUES = 100;
-const unsigned long PUT_VALUES = 100000;
-const std::string VALUE = "123456789ABCDEFG";
+const unsigned long VALUES = 1000000;
+const std::string VALUE = "A";
 
 int main() {
   LOG("Opening database");
@@ -61,27 +60,21 @@ int main() {
   ScreeDB* db;
   assert(ScreeDB::Open(options, db_options, kDBPath, &db).ok());
 
-  LOG("Putting " << PUT_VALUES << " values");
+  LOG("Putting " << VALUES << " values");
   unsigned long started = current_millis();
-  for (int i = 0; i < PUT_VALUES; i++) {
-    assert(db->Put(WriteOptions(), std::to_string(i), VALUE).ok());
-  }
-  LOG("Put " << PUT_VALUES << " values in " << current_millis() - started << " ms");
+  for (int i = 0; i < VALUES; i++) assert(db->Put(WriteOptions(), std::to_string(i), VALUE).ok());
+  LOG("     in " << current_millis() - started << " ms");
 
-  LOG("Getting oldest " << GET_VALUES << " values");
+  LOG("Getting " << VALUES << " values");
   started = current_millis();
-  for (int i = 0; i < GET_VALUES; i++) {
-    std::string value;
-    assert(db->Get(ReadOptions(), std::to_string(i), &value).ok() && value == VALUE);
-  }
-  LOG("Got oldest " << GET_VALUES << " values in " << current_millis() - started << " ms");
+  std::string value;
+  for (int i = 0; i < VALUES; i++) assert(db->Get(ReadOptions(), std::to_string(i), &value).ok());
+  LOG("     in " << current_millis() - started << " ms");
 
-  LOG("Deleting oldest " << GET_VALUES << " values");
+  LOG("Deleting " << VALUES << " values");
   started = current_millis();
-  for (int i = 0; i < GET_VALUES; i++) {
-    assert(db->Delete(WriteOptions(), std::to_string(i)).ok());
-  }
-  LOG("Deleted oldest " << GET_VALUES << " values in " << current_millis() - started << " ms");
+  for (int i = 0; i < VALUES; i++) assert(db->Delete(WriteOptions(), std::to_string(i)).ok());
+  LOG("      in " << current_millis() - started << " ms");
 
   LOG("Closing database");
   delete db;

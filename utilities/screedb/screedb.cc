@@ -38,6 +38,7 @@
 
 #include <iostream>
 #include <unistd.h>
+#include <algorithm>
 #include "screedb.h"
 
 #define DO_LOG 0
@@ -60,10 +61,10 @@ ScreeDB::ScreeDB(const Options& options, const ScreeDBOptions& dboptions,
   LOG("Opening database");
   if (access(GetNamePtr(), F_OK) != 0) {
     LOG("Creating new persistent pool");
-    pop_ = pool<ScreeDBRoot>::create(GetNamePtr(), "ScreeDB",          // todo name is hardcoded
-                                     PMEMOBJ_MIN_POOL * 64, S_IRWXU);  // todo size is hardcoded
+    pop_ = pool<ScreeDBRoot>::create(GetNamePtr(), "ScreeDB",            // todo name is hardcoded
+                                     PMEMOBJ_MIN_POOL * 64, S_IRWXU);    // todo size is hardcoded
   } else {
-    pop_ = pool<ScreeDBRoot>::open(GetNamePtr(), "ScreeDB");           // todo name is hardcoded
+    pop_ = pool<ScreeDBRoot>::open(GetNamePtr(), "ScreeDB");             // todo name is hardcoded
   }
   Recover();
   LOG("Opened database ok");
@@ -86,30 +87,22 @@ ScreeDB::~ScreeDB() {
 Status ScreeDB::Delete(const WriteOptions& options, ColumnFamilyHandle* column_family,
                        const Slice& key) {
   LOG("Delete key=" << key.data_);
-  auto root = pop_.get_root();
-  if (!root->head) {
+  auto leafnode = LeafSearch(key);
+  if (!leafnode) {
     LOG("   head not present");
     return Status::OK();
-  } else {
-    const uint8_t hash = PearsonHash(key.data_);
-    auto leaf = root->head;
-    while (true) {  // todo unbounded loop
-      for (int slot = 0; slot < LEAF_KEYS; slot++) {
-        if (leaf->hashes[slot] == hash) {
-          auto kv = leaf->keyvalues[slot];
-          if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
-            LOG("   updating slot=" << slot);
-            transaction::exec_tx(pop_, [&] {
-              kv->key_ptr[0] = 0;  // todo not reclaiming allocated key/value storage
-            });
-          }
-        }
-      }
-      if (leaf->next) {
-        leaf = leaf->next;
-      } else {
-        LOG("   could not find key");
-        break;
+  }
+  const uint8_t hash = PearsonHash(key.data_);
+  auto leaf = leafnode->leaf;
+  for (int slot = 0; slot < NODE_KEYS; slot++) {
+    if (leaf->hashes[slot] == hash) {
+      auto kv = leaf->keyvalues[slot];
+      if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
+        LOG("   freeing slot=" << slot);
+        transaction::exec_tx(pop_, [&] {
+          LeafFreeSpecificSlot(leaf, slot);  // todo not reclaiming entire leaf if empty
+        });
+        break;  // no duplicate keys allowed
       }
     }
   }
@@ -122,32 +115,25 @@ Status ScreeDB::Delete(const WriteOptions& options, ColumnFamilyHandle* column_f
 Status ScreeDB::Get(const ReadOptions& options, ColumnFamilyHandle* column_family,
                     const Slice& key, std::string* value) {
   LOG("Get key=" << key.data_);
-  auto root = pop_.get_root();
-  if (!root->head) {
+  auto leafnode = LeafSearch(key);
+  if (!leafnode) {
     LOG("   head not present");
     return Status::NotFound();
-  } else {
-    const uint8_t hash = PearsonHash(key.data_);
-    auto leaf = root->head;
-    while (true) {  // todo unbounded loop
-      for (int slot = (LEAF_KEYS - 1); slot >= 0; slot--) {  // reverse scan for most recent
-        if (leaf->hashes[slot] == hash) {
-          auto kv = leaf->keyvalues[slot];
-          if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
-            value->append(kv->value_ptr.get());
-            LOG("   found value=" << kv->value_ptr.get() << ", slot=" << slot);
-            return Status::OK();
-          }
-        }
-      }
-      if (leaf->next) {
-        leaf = leaf->next;
-      } else {
-        LOG("   could not find key");
-        return Status::NotFound();
+  }
+  const uint8_t hash = PearsonHash(key.data_);
+  auto leaf = leafnode->leaf;
+  for (int slot = 0; slot < NODE_KEYS; slot++) {
+    if (leaf->hashes[slot] == hash) {
+      auto kv = leaf->keyvalues[slot];
+      if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
+        value->append(kv->value_ptr.get());
+        LOG("   found value=" << kv->value_ptr.get() << ", slot=" << slot);
+        return Status::OK();
       }
     }
   }
+  LOG("   could not find key");
+  return Status::NotFound();
 }
 
 // If keys[i] does not exist in the database, then the i'th returned status will be one for
@@ -178,56 +164,241 @@ std::vector<Status> ScreeDB::MultiGet(const ReadOptions& options,
 Status ScreeDB::Put(const WriteOptions& options, ColumnFamilyHandle* column_family,
                     const Slice& key, const Slice& value) {
   LOG("Put key=" << key.data_ << ", value=" << value.data_);
-  auto root = pop_.get_root();
-  auto leaf = root->head;
+  const uint8_t hash = PearsonHash(key.data_);
 
-  // attempt to add to head leaf first
-  if (leaf) {
-    for (int slot = 0; slot < LEAF_KEYS; slot++) {
-      if (leaf->hashes[slot] != 0) continue;
-      LOG("   updating slot=" << slot);
-      transaction::exec_tx(pop_, [&] {
-        LeafFillSlot(leaf, slot, key, value);
-      });
-      return Status::OK();
-    }
+  // add head leaf if none present
+  auto leafnode = LeafSearch(key);
+  if (!leafnode) {
+    LOG("   adding head leaf");
+    persistent_ptr<ScreeDBLeaf> new_leaf;
+    auto root = pop_.get_root();
+    auto old_head = root->head;
+    transaction::exec_tx(pop_, [&] {
+      new_leaf = make_persistent<ScreeDBLeaf>();
+      new_leaf->next = old_head;
+      LeafFillSpecificSlot(new_leaf, hash, key, value, 0);
+      root->head = new_leaf;
+    });
+    leafnode = new ScreeDBLeafNode();
+    leafnode->leaf = new_leaf;
+    top_ = leafnode;
+    return Status::OK();
   }
 
-  // add new leaf in head position
-  LOG("   adding new leaf");
-  transaction::exec_tx(pop_, [&] {
-    root->head = make_persistent<ScreeDBLeaf>();
-    root->head->next = leaf;
-    LeafFillSlot(root->head, 0, key, value);
-  });
-  return Status::OK();
+  // update leaf, splitting if necessary
+  if (LeafFillSlotForKey(leafnode->leaf, hash, key, value)) {
+    return Status::OK();
+  } else {
+    LeafSplit(leafnode, hash, key, value);
+    return Status::OK();
+  }
 }
 
 // ===============================================================================================
 // PROTECTED LEAF METHODS
 // ===============================================================================================
 
-void ScreeDB::LeafDelete() {
-
+void ScreeDB::LeafDebugDump(ScreeDBNode* node) {
+  if (DO_LOG) {
+    if (node->is_leaf()) {
+      auto leaf = ((ScreeDBLeafNode*) node)->leaf;
+      for (int slot = 0; slot < NODE_KEYS; slot++) {
+        LOG("      " << std::to_string(slot) << "="
+                     << (leaf->hashes[slot] == 0 ? "n/a" : leaf->keyvalues[slot]->key_ptr.get()));
+      }
+    } else {
+      ScreeDBInnerNode* inner_node = (ScreeDBInnerNode*) node;
+      LOG("      keycount: " << std::to_string(inner_node->keycount));
+      for (int idx = 0; idx < inner_node->keycount; idx++) {
+        LOG("      " << std::to_string(idx) << ":" << inner_node->keys[idx]);
+      }
+    }
+  }
 }
 
-void ScreeDB::LeafFillSlot(const LEAF_PTR_T leaf, const int slot, const Slice& key,
-                           const Slice& value) {
-  leaf->hashes[slot] = PearsonHash(key.data_);                         // calculate & store hash
-  leaf->keyvalues[slot] = make_persistent<ScreeDBKeyValue>();          // make key/value object
+void ScreeDB::LeafDebugDumpWithChildren(ScreeDBInnerNode* inner) {
+  LeafDebugDump(inner);
+  for (int i = 0; i < inner->keycount + 1; i++) {
+    LOG ("      dumping child node " << std::to_string(i) << "------------------------");
+    LeafDebugDump(inner->children[i]);
+  }
+}
+
+void ScreeDB::LeafFillFirstEmptySlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+                                     const Slice& key, const Slice& value) {
+  for (int slot = 0; slot < NODE_KEYS; slot++) {
+    if (leaf->hashes[slot] == 0) {
+      LeafFillSpecificSlot(leaf, hash, key, value, slot);
+      return;
+    }
+  }
+}
+
+bool ScreeDB::LeafFillSlotForKey(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+                                 const Slice& key, const Slice& value) {
+  // scan for empty/matching slots
+  int first_empty_slot = -1;
+  int key_match_slot = -1;
+  for (int slot = 0; slot < NODE_KEYS; slot++) {
+    auto slot_hash = leaf->hashes[slot];
+    if (slot_hash == 0) {
+      if (first_empty_slot < 0) first_empty_slot = slot;
+    } else if (slot_hash == hash) {
+      if (strcmp(leaf->keyvalues[slot]->key_ptr.get(), key.data_) == 0) {
+        key_match_slot = slot;
+        break;  // no duplicate keys allowed
+      }
+    }
+  }
+
+  // update suitable slot if found
+  int slot = key_match_slot >= 0 ? key_match_slot : first_empty_slot;
+  if (slot >= 0) {
+    LOG("   filling slot=" << slot);
+    transaction::exec_tx(pop_, [&] {
+      LeafFillSpecificSlot(leaf, hash, key, value, slot);
+    });
+  }
+  return slot >= 0;
+}
+
+void ScreeDB::LeafFillSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+                                   const Slice& key, const Slice& value, const int slot) {
+  assert(slot >= 0 && slot < NODE_KEYS);
   auto kv = leaf->keyvalues[slot];
-  kv->key_ptr = make_persistent<char[]>(key.size() + 1);               // reserve space for key
-  kv->value_ptr = make_persistent<char[]>(value.size() + 1);           // reserve space for value
-  memcpy(kv->key_ptr.get(), key.data_, key.size());                    // copy key data
-  memcpy(kv->value_ptr.get(), value.data_, value.size());              // copy value data
+  if (kv) {
+    delete_persistent<char[]>(kv->value_ptr, kv->value_size);            // free existing value
+  } else {
+    leaf->hashes[slot] = hash;                                           // copy hash into leaf
+    leaf->keyvalues[slot] = make_persistent<ScreeDBKeyValue>();          // make key/value object
+    kv = leaf->keyvalues[slot];
+    kv->key_size = key.size() + 1;                                       // calculate key size
+    kv->key_ptr = make_persistent<char[]>(kv->key_size);                 // reserve space for key
+    memcpy(kv->key_ptr.get(), key.data_, key.size());                    // copy key chars
+  }
+  kv->value_size = value.size() + 1;                                     // calculate value size
+  kv->value_ptr = make_persistent<char[]>(kv->value_size);               // reserve space for value
+  memcpy(kv->value_ptr.get(), value.data_, value.size());                // copy value chars
 }
 
-void ScreeDB::LeafFind(const Slice& key) {
-
+void ScreeDB::LeafFreeSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const int slot) {
+  assert(slot >= 0 && slot < NODE_KEYS);
+  auto kv = leaf->keyvalues[slot];
+  delete_persistent<char[]>(kv->value_ptr, kv->value_size);              // free value chars
+  delete_persistent<char[]>(kv->key_ptr, kv->key_size);                  // free key chars
+  delete_persistent<ScreeDBKeyValue>(kv);                                // free keyvalue
+  leaf->keyvalues[slot] = nullptr;                                       // clear slot pointer
+  leaf->hashes[slot] = 0;                                                // clear slot hash
 }
 
-void ScreeDB::LeafSplit() {
+ScreeDBLeafNode* ScreeDB::LeafSearch(const Slice& key) {
+  ScreeDBNode* node = top_;
+  if (node == nullptr) return nullptr;
+  auto key_string = std::string(key.data_);
+  while (!node->is_leaf()) {
+    bool matched = false;
+    ScreeDBInnerNode* inner = (ScreeDBInnerNode*) node;
+    assert(inner == top_ || inner->keycount >= NODE_KEYS_MIDPOINT);
+    for (uint8_t idx = 0; idx < inner->keycount; idx++) {
+      node = inner->children[idx];
+      if (key_string.compare(inner->keys[idx]) <= 0) {
+        matched = true;
+        break;
+      }
+    }
+    if (!matched) node = inner->children[inner->keycount];
+  }
+  assert(node->is_leaf());
+  return (ScreeDBLeafNode*) node;
+}
 
+void ScreeDB::LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
+                        const Slice& key, const Slice& value) {
+  const auto leaf = leafnode->leaf;
+  std::string split_key;
+  { // find split key, the midpoint of all keys including new key
+    std::vector<std::string> keys(NODE_KEYS + 1);
+    for (int slot = 0; slot < NODE_KEYS; slot++) {
+      keys[slot] = (std::string(leaf->keyvalues[slot]->key_ptr.get()));
+    }
+    keys[NODE_KEYS] = std::string(key.data_);
+    std::sort(keys.begin(), keys.end());
+    split_key = keys[NODE_KEYS_MIDPOINT];
+    LOG("   splitting leaf at key=" << split_key);
+  }
+
+  // split leaf into two leaves, moving slots that sort above split key to new leaf
+  persistent_ptr<ScreeDBLeaf> new_leaf;
+  auto root = pop_.get_root();
+  auto old_head = root->head;
+  transaction::exec_tx(pop_, [&] {
+    new_leaf = make_persistent<ScreeDBLeaf>();
+    new_leaf->next = old_head;
+    for (int slot = 0; slot < NODE_KEYS; slot++) {
+      if (std::string(leaf->keyvalues[slot]->key_ptr.get()).compare(split_key) > 0) {
+        new_leaf->hashes[slot] = leaf->hashes[slot];
+        new_leaf->keyvalues[slot] = leaf->keyvalues[slot];
+        leaf->hashes[slot] = 0;
+        leaf->keyvalues[slot] = nullptr;
+      }
+    }
+    auto target_leaf = std::string(key.data_).compare(split_key) > 0 ? new_leaf : leaf;
+    LeafFillFirstEmptySlot(target_leaf, hash, key, value);
+    root->head = new_leaf;
+  });
+
+  // recursively update volatile parents outside persistent transaction
+  auto new_leafnode = new ScreeDBLeafNode();
+  new_leafnode->leaf = new_leaf;
+  new_leafnode->parent = leafnode->parent;
+  LeafUpdateParentsAfterSplit(leafnode, new_leafnode, &split_key);
+}
+
+void ScreeDB::LeafUpdateParentsAfterSplit(ScreeDBNode* node, ScreeDBNode* new_node,
+                                          std::string* split_key) {
+  if (!node->parent) {
+    LOG("   creating new top node for split_key=" << *split_key);
+    auto top = new ScreeDBInnerNode();
+    top->keycount = 1;
+    top->keys[0] = *split_key;
+    top->children[0] = node;
+    top->children[1] = new_node;
+    node->parent = top;
+    new_node->parent = top;
+    LeafDebugDumpWithChildren(top);                                      // dump details
+    top_ = top;                                                          // assign new top node
+    return;                                                              // end recursion
+  }
+
+  LOG("   updating parents for split_key=" << *split_key);
+  ScreeDBInnerNode* inner = (ScreeDBInnerNode*) node->parent;
+  { // insert split_key and new_node into inner node in sorted order
+    const uint8_t keycount = inner->keycount;
+    int idx = -1;  // position where split_key should be inserted
+    while (idx < keycount) if (inner->keys[++idx].compare(*split_key) > 0) break;
+    for (int i = keycount - 1; i >= idx; i--) inner->keys[i + 1] = inner->keys[i];
+    for (int i = keycount; i >= idx; i--) inner->children[i + 1] = inner->children[i];
+    inner->keys[idx] = *split_key;
+    inner->children[idx + 1] = new_node;
+    inner->keycount = (uint8_t) (keycount + 1);
+  }
+  const uint8_t keycount = inner->keycount;
+  if (keycount <= NODE_KEYS) return;                                     // end recursion
+
+  // split inner node at the midpoint, update parents as needed
+  auto new_inner = new ScreeDBInnerNode();                               // allocate new node
+  new_inner->parent = inner->parent;                                     // set parent reference
+  for (int i = NODE_KEYS_UPPER; i < keycount; i++) {                     // copy all upper keys
+    new_inner->keys[i - NODE_KEYS_UPPER] = inner->keys[i];               // copy key string
+  }
+  for (int i = NODE_KEYS_UPPER; i < keycount + 1; i++) {                 // copy all upper children
+    new_inner->children[i - NODE_KEYS_UPPER] = inner->children[i];       // copy child reference
+    new_inner->children[i - NODE_KEYS_UPPER]->parent = new_inner;        // set parent reference
+  }
+  new_inner->keycount = NODE_KEYS_MIDPOINT;                              // always half the keys
+  std::string new_split_key = inner->keys[NODE_KEYS_MIDPOINT];           // save for later
+  inner->keycount = NODE_KEYS_MIDPOINT;                                  // todo leak here?
+  LeafUpdateParentsAfterSplit(inner, new_inner, &new_split_key);         // recursive update
 }
 
 // ===============================================================================================
@@ -236,9 +407,6 @@ void ScreeDB::LeafSplit() {
 
 void ScreeDB::Recover() {
   LOG("Recovering database");
-
-  // Create root if not already present
-  // @todo handle opened/closed inequality, including count correction
   auto root = pop_.get_root();
   if (!root->head) {
     LOG("   creating root");
@@ -248,25 +416,36 @@ void ScreeDB::Recover() {
     });
   } else {
     LOG("   recovering head: opened=" << root->opened << ", closed=" << root->closed);
+    // @todo handle opened/closed inequality, including count correction
+    RebuildNodes();
     transaction::exec_tx(pop_, [&] { root->opened = root->opened + 1; });
   }
-
-  RebuildInnerNodes();
   LOG("Recovered database ok");
 }
 
-void ScreeDB::RebuildInnerNodes() {
-  LOG("Rebuilding inner nodes");
-  auto root = pop_.get_root();
-  if (root->head) {
-    auto leaf = root->head;
-    for (int i = 0; true; i++) {
-      auto kv = leaf->keyvalues[0];
-      LOG("   leaf[" << i << "] key=" << kv->key_ptr.get() << ", value=" << kv->value_ptr.get());
-      if (leaf->next) leaf = leaf->next; else break;
+void ScreeDB::RebuildNodes() {
+  LOG("   rebuilding nodes");
+
+  // traverse persistent leaves to build volatile leaf nodes
+  ScreeDBLeafNode* first_leafnode = nullptr;
+  auto leaf = pop_.get_root()->head;
+  while (true) {  // todo unbounded loop
+    ScreeDBLeafNode* leafnode = new ScreeDBLeafNode();
+    leafnode->leaf = leaf;
+    if (first_leafnode == nullptr) first_leafnode = leafnode;
+    if (leaf->next) {
+      leaf = leaf->next;
+    } else {
+      break;
     }
   }
-  LOG("Rebuilt inner nodes ok");
+
+  // build inner nodes and initialize top pointer
+  {
+    top_ = first_leafnode;  // todo should be the topmost inner node
+  }
+
+  LOG("   rebuilt nodes ok");
 }
 
 void ScreeDB::Shutdown() {

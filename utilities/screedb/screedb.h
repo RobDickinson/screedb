@@ -55,33 +55,48 @@ using nvml::obj::pool;
 namespace rocksdb {
 namespace screedb {
 
+#define NODE_KEYS 48                                       // maximum keys in tree nodes
+#define NODE_KEYS_MIDPOINT 24                              // halfway point within the node
+#define NODE_KEYS_UPPER 25                                 // index where upper half of keys begins
+
 struct ScreeDBOptions {
   // Nothing yet
 };
 
-struct ScreeDBKeyValue {                            // single key/value pair
-  persistent_ptr<char[]> key_ptr;                   // null-padded variable-length key
-  persistent_ptr<char[]> value_ptr;                 // null-padded variable-length value
+struct ScreeDBKeyValue {                                   // single key/value pair
+  p<uint32_t> key_size;                                    // size of key plus null terminator
+  p<uint32_t> value_size;                                  // size of value plus null terminator
+  persistent_ptr<char[]> key_ptr;                          // null-padded variable-length key
+  persistent_ptr<char[]> value_ptr;                        // null-padded variable-length value
 };
 
-// persistent type macros for leaf nodes
-#define LEAF_KEYS                 48
-#define LEAF_KEYVALUE_T           persistent_ptr<ScreeDBKeyValue>
-#define LEAF_LOCK_T               p<uint8_t>
-#define LEAF_PTR_T                persistent_ptr<ScreeDBLeaf>
-#define LEAF_VALUEHASH_T          p<uint8_t>
-
-struct ScreeDBLeaf {
-  LEAF_PTR_T next;                                  // 16 bytes, points to next leaf
-  LEAF_VALUEHASH_T hashes[LEAF_KEYS];               // 48 bytes, rest of cache line
-  LEAF_KEYVALUE_T keyvalues[LEAF_KEYS];             // contained key/value pairs
-  LEAF_LOCK_T lock;                                 // boolean lock
+struct ScreeDBLeaf {                                       // persistent leaves of the tree
+  p<uint8_t> hashes[NODE_KEYS];                            // 48 bytes, Pearson hashes of keys
+  persistent_ptr<ScreeDBLeaf> next;                        // 16 bytes, points to next leaf
+  persistent_ptr<ScreeDBKeyValue> keyvalues[NODE_KEYS];    // contained key/value pairs
 };
 
 struct ScreeDBRoot {
-  p<uint64_t> opened;                               // number of times opened
-  p<uint64_t> closed;                               // number of times closed safely
-  LEAF_PTR_T head;                                  // head leaf node
+  p<uint64_t> opened;                                      // number of times opened
+  p<uint64_t> closed;                                      // number of times closed safely
+  persistent_ptr<ScreeDBLeaf> head;                        // head of linked list of leaves
+};
+
+struct ScreeDBNode {                                       // volatile nodes of the tree
+  virtual bool is_leaf() { return false; }                 // assume inner node by default
+  ScreeDBNode* parent;                                     // parent of this node (null if top)
+};
+
+struct ScreeDBInnerNode : ScreeDBNode {                    // volatile inner nodes of the tree
+  uint8_t keycount;                                        // count of keys in this node
+  std::string keys[NODE_KEYS + 1];                         // child keys plus one overflow slot
+  ScreeDBNode* children[NODE_KEYS + 2];                    // child nodes plus one overflow slot
+};
+
+struct ScreeDBLeafNode : ScreeDBNode {                     // volatile leaf nodes of the tree
+  virtual bool is_leaf() override { return true; }         // report these nodes as leaves
+  persistent_ptr<ScreeDBLeaf> leaf;                        // pointer to persistent leaf
+  bool lock;                                               // boolean modification lock
 };
 
 class ScreeDB : public DB {
@@ -460,14 +475,24 @@ protected:
   ScreeDB(const Options& options, const ScreeDBOptions& dboptions, const std::string& dbname);
 
   // Leaf methods
-  void LeafDelete();
-  void LeafFillSlot(const LEAF_PTR_T leaf, const int slot, const Slice& key, const Slice& value);
-  void LeafFind(const Slice& key);
-  void LeafSplit();
+  void LeafDebugDump(ScreeDBNode* node);
+  void LeafDebugDumpWithChildren(ScreeDBInnerNode* inner);
+  void LeafFillFirstEmptySlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+                              const Slice& key, const Slice& value);
+  bool LeafFillSlotForKey(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+                          const Slice& key, const Slice& value);
+  void LeafFillSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+                            const Slice& key, const Slice& value, const int slot);
+  void LeafFreeSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const int slot);
+  ScreeDBLeafNode* LeafSearch(const Slice& key);
+  void LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
+                 const Slice& key, const Slice& value);
+  void LeafUpdateParentsAfterSplit(ScreeDBNode* node, ScreeDBNode* new_node,
+                                   std::string* split_key);
 
   // Lifecycle methods
   void Recover();
-  void RebuildInnerNodes();
+  void RebuildNodes();
   void Shutdown();
 
   // Helper methods
@@ -476,7 +501,8 @@ protected:
 private:
   const std::string dbname_;        // Name when constructed
   const DBOptions dboptions_;       // Options when constructed
-  pool<ScreeDBRoot> pop_;           // Persistent pool for root
+  pool<ScreeDBRoot> pop_;           // Pool for persistent root
+  ScreeDBNode* top_ = nullptr;      // Pointer to top/middle of volatile tree
 
   ScreeDB(const ScreeDB&);          // Prevent copying
   void operator=(const ScreeDB&);   // Prevent assignment

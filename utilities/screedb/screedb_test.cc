@@ -80,7 +80,6 @@ TEST_F(ScreeDBTest, SizeofTest) {
   ASSERT_TRUE(sizeof(ScreeDBRoot) == 32);
   ASSERT_TRUE(sizeof(ScreeDBLeaf) == 832);
   ASSERT_TRUE(sizeof_field(ScreeDBLeaf, hashes) + sizeof_field(ScreeDBLeaf, next) == 64);
-  ASSERT_TRUE(sizeof(ScreeDBKeyValue) == 40);
 
   // volatile structs
   ASSERT_TRUE(sizeof(ScreeDBInnerNode) == 1992);

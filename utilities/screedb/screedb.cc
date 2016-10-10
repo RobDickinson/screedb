@@ -96,11 +96,10 @@ Status ScreeDB::Delete(const WriteOptions& options, ColumnFamilyHandle* column_f
   auto leaf = leafnode->leaf;
   for (int slot = 0; slot < NODE_KEYS; slot++) {
     if (leaf->hashes[slot] == hash) {
-      auto kv = leaf->keyvalues[slot];
-      if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
+      if (strcmp(leaf->kvs[slot].get(), key.data_) == 0) {
         LOG("   freeing slot=" << slot);
         transaction::exec_tx(pop_, [&] {
-          LeafFreeSpecificSlot(leaf, slot);  // todo not reclaiming entire leaf if empty
+          LeafFreeSpecificSlot(leaf, key, slot);  // todo not reclaiming entire leaf if empty
         });
         break;  // no duplicate keys allowed
       }
@@ -124,10 +123,13 @@ Status ScreeDB::Get(const ReadOptions& options, ColumnFamilyHandle* column_famil
   auto leaf = leafnode->leaf;
   for (int slot = 0; slot < NODE_KEYS; slot++) {
     if (leaf->hashes[slot] == hash) {
-      auto kv = leaf->keyvalues[slot];
-      if (strcmp(kv->key_ptr.get(), key.data_) == 0) {
-        value->append(kv->value_ptr.get());
-        LOG("   found value=" << kv->value_ptr.get() << ", slot=" << slot);
+      char* kv = leaf->kvs[slot].get();
+      if (strcmp(kv, key.data_) == 0) {
+        char* kv_ptr = kv;
+        kv_ptr += key.size() + 2;
+        std::string v = std::string(kv_ptr);
+        value->append(v);
+        LOG("   found value=" << v << ", slot=" << slot);
         return Status::OK();
       }
     }
@@ -204,7 +206,7 @@ void ScreeDB::LeafDebugDump(ScreeDBNode* node) {
       auto leaf = ((ScreeDBLeafNode*) node)->leaf;
       for (int slot = 0; slot < NODE_KEYS; slot++) {
         LOG("      " << std::to_string(slot) << "="
-                     << (leaf->hashes[slot] == 0 ? "n/a" : leaf->keyvalues[slot]->key_ptr.get()));
+                     << (leaf->hashes[slot] == 0 ? "n/a" : leaf->kvs[slot].get()));
       }
     } else {
       ScreeDBInnerNode* inner_node = (ScreeDBInnerNode*) node;
@@ -244,7 +246,7 @@ bool ScreeDB::LeafFillSlotForKey(const persistent_ptr<ScreeDBLeaf> leaf, const u
     if (slot_hash == 0) {
       if (first_empty_slot < 0) first_empty_slot = slot;
     } else if (slot_hash == hash) {
-      if (strcmp(leaf->keyvalues[slot]->key_ptr.get(), key.data_) == 0) {
+      if (strcmp(leaf->kvs[slot].get(), key.data_) == 0) {
         key_match_slot = slot;
         break;  // no duplicate keys allowed
       }
@@ -264,30 +266,31 @@ bool ScreeDB::LeafFillSlotForKey(const persistent_ptr<ScreeDBLeaf> leaf, const u
 
 void ScreeDB::LeafFillSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
                                    const Slice& key, const Slice& value, const int slot) {
-  assert(slot >= 0 && slot < NODE_KEYS);
-  auto kv = leaf->keyvalues[slot];
-  if (kv) {
-    delete_persistent<char[]>(kv->value_ptr, kv->value_size);            // free existing value
-  } else {
-    leaf->hashes[slot] = hash;                                           // copy hash into leaf
-    leaf->keyvalues[slot] = make_persistent<ScreeDBKeyValue>();          // make key/value object
-    kv = leaf->keyvalues[slot];
-    kv->key_size = key.size() + 1;                                       // calculate key size
-    kv->key_ptr = make_persistent<char[]>(kv->key_size);                 // reserve space for key
-    memcpy(kv->key_ptr.get(), key.data_, key.size());                    // copy key chars
-  }
-  kv->value_size = value.size() + 1;                                     // calculate value size
-  kv->value_ptr = make_persistent<char[]>(kv->value_size);               // reserve space for value
-  memcpy(kv->value_ptr.get(), value.data_, value.size());                // copy value chars
+  assert(slot >= 0 && slot < NODE_KEYS);                                 // check slot is in range
+  if (leaf->kvs[slot]) LeafFreeSpecificSlot(leaf, key, slot);            // free slot if present
+  leaf->hashes[slot] = hash;                                             // copy hash into leaf
+  size_t key_size = key.size();                                          // read key size
+  size_t value_size = value.size();                                      // read value size
+  size_t kv_size = key_size + value_size + 2;                            // set total size
+  leaf->kvs[slot] = make_persistent<char[]>(kv_size);                    // reserve space for k/v
+  char* kv = leaf->kvs[slot].get();                                      // set ptr into buffer
+  memcpy(kv, key.data(), key_size);                                      // copy key into buffer
+  kv[key_size + 1] = 0;                                                  // set null char for key
+  char* kv_ptr = kv;                                                     // set ptr into buffer
+  kv_ptr += key_size + 2;                                                // advance ptr past key
+  memcpy(kv_ptr, value.data(), value_size);                              // copy value into buffer
+  kv[kv_size] = 0;                                                       // set null char for value
 }
 
-void ScreeDB::LeafFreeSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const int slot) {
-  assert(slot >= 0 && slot < NODE_KEYS);
-  auto kv = leaf->keyvalues[slot];
-  delete_persistent<char[]>(kv->value_ptr, kv->value_size);              // free value chars
-  delete_persistent<char[]>(kv->key_ptr, kv->key_size);                  // free key chars
-  delete_persistent<ScreeDBKeyValue>(kv);                                // free keyvalue
-  leaf->keyvalues[slot] = nullptr;                                       // clear slot pointer
+void ScreeDB::LeafFreeSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const Slice& key,
+                                   const int slot) {
+  assert(slot >= 0 && slot < NODE_KEYS);                                 // check slot is in range
+  char* kv_ptr = leaf->kvs[slot].get();                                  // set ptr into kv
+  kv_ptr += key.size() + 2;                                              // advance ptr past key
+  std::string v = std::string(kv_ptr);                                   // read value
+  size_t kv_size = key.size() + v.size() + 2;                            // calculate total size
+  delete_persistent<char[]>(leaf->kvs[slot], kv_size);                   // release memory
+  leaf->kvs[slot] = nullptr;                                             // clear slot pointer
   leaf->hashes[slot] = 0;                                                // clear slot hash
 }
 
@@ -319,7 +322,7 @@ void ScreeDB::LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
   { // find split key, the midpoint of all keys including new key
     std::vector<std::string> keys(NODE_KEYS + 1);
     for (int slot = 0; slot < NODE_KEYS; slot++) {
-      keys[slot] = (std::string(leaf->keyvalues[slot]->key_ptr.get()));
+      keys[slot] = (std::string(leaf->kvs[slot].get()));
     }
     keys[NODE_KEYS] = std::string(key.data_);
     std::sort(keys.begin(), keys.end());
@@ -335,14 +338,14 @@ void ScreeDB::LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
     new_leaf = make_persistent<ScreeDBLeaf>();
     new_leaf->next = old_head;
     for (int slot = 0; slot < NODE_KEYS; slot++) {
-      if (std::string(leaf->keyvalues[slot]->key_ptr.get()).compare(split_key) > 0) {
+      if (strcmp(leaf->kvs[slot].get(), split_key.data()) > 0) {
         new_leaf->hashes[slot] = leaf->hashes[slot];
-        new_leaf->keyvalues[slot] = leaf->keyvalues[slot];
+        new_leaf->kvs[slot] = leaf->kvs[slot];
         leaf->hashes[slot] = 0;
-        leaf->keyvalues[slot] = nullptr;
+        leaf->kvs[slot] = nullptr;
       }
     }
-    auto target_leaf = std::string(key.data_).compare(split_key) > 0 ? new_leaf : leaf;
+    auto target_leaf = strcmp(key.data_, split_key.data()) > 0 ? new_leaf : leaf;
     LeafFillFirstEmptySlot(target_leaf, hash, key, value);
     root->head = new_leaf;
   });

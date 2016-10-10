@@ -63,17 +63,10 @@ struct ScreeDBOptions {
   // Nothing yet
 };
 
-struct ScreeDBKeyValue {                                   // single key/value pair
-  p<uint32_t> key_size;                                    // size of key plus null terminator
-  p<uint32_t> value_size;                                  // size of value plus null terminator
-  persistent_ptr<char[]> key_ptr;                          // null-padded variable-length key
-  persistent_ptr<char[]> value_ptr;                        // null-padded variable-length value
-};
-
 struct ScreeDBLeaf {                                       // persistent leaves of the tree
   p<uint8_t> hashes[NODE_KEYS];                            // 48 bytes, Pearson hashes of keys
   persistent_ptr<ScreeDBLeaf> next;                        // 16 bytes, points to next leaf
-  persistent_ptr<ScreeDBKeyValue> keyvalues[NODE_KEYS];    // contained key/value pairs
+  persistent_ptr<char[]> kvs[NODE_KEYS];                   // contained key/value pairs
 };
 
 struct ScreeDBRoot {
@@ -483,7 +476,8 @@ protected:
                           const Slice& key, const Slice& value);
   void LeafFillSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
                             const Slice& key, const Slice& value, const int slot);
-  void LeafFreeSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const int slot);
+  void LeafFreeSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const Slice& key,
+                            const int slot);
   ScreeDBLeafNode* LeafSearch(const Slice& key);
   void LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
                  const Slice& key, const Slice& value);

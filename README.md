@@ -97,6 +97,8 @@ In Project View, right-click on db|examples|include|memtable|table|util|utilitie
 
 The .gitignore for this project ignores CMakeLists.txt and the entire .idea directory.
 
+Apply editor/beautifier settings (matching RocksDB code style) by importing clion-settings.jar from clion-settings.zip.
+
 <a name="related_work"/>
 
 Related Work

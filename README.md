@@ -49,7 +49,7 @@ Install NVML:
 cd ~
 git clone https://github.com/pmem/nvml.git
 cd nvml
-sudo make EXPERIMENTAL=y install -j8            # C++ bindings are experimental
+sudo make install -j8
 ```
 
 Get the sources:

@@ -52,25 +52,22 @@ unsigned long current_millis() {
 }
 
 void testDelete(ScreeDB* db) {
-  LOG("Deleting " << VALUES << " values");
   auto started = current_millis();
   for (int i = 0; i < VALUES; i++) assert(db->Delete(WriteOptions(), std::to_string(i)).ok());
-  LOG("      in " << current_millis() - started << " ms");
+  LOG("   in " << current_millis() - started << " ms");
 }
 
 void testGet(ScreeDB* db) {
-  LOG("Getting " << VALUES << " values");
   auto started = current_millis();
   std::string value;
   for (int i = 0; i < VALUES; i++) assert(db->Get(ReadOptions(), std::to_string(i), &value).ok());
-  LOG("     in " << current_millis() - started << " ms");
+  LOG("   in " << current_millis() - started << " ms");
 }
 
 void testPut(ScreeDB* db) {
-  LOG("Putting " << VALUES << " values");
   auto started = current_millis();
   for (int i = 0; i < VALUES; i++) assert(db->Put(WriteOptions(), std::to_string(i), VALUE).ok());
-  LOG("     in " << current_millis() - started << " ms");
+  LOG("   in " << current_millis() - started << " ms");
 }
 
 int main() {
@@ -82,11 +79,16 @@ int main() {
   assert(ScreeDB::Open(options, db_options, DB_PATH, &db).ok());
 
   // run some tests
+  LOG("Inserting " << VALUES << " values");
   testPut(db);
+  LOG("Getting " << VALUES << " values");
   testGet(db);
+  LOG("Updating " << VALUES << " values");
+  testPut(db);
+  LOG("Deleting " << VALUES << " values");
   testDelete(db);
+  LOG("Reinserting " << VALUES << " values");
   testPut(db);
-  testGet(db);
 
   LOG("Closing database");
   delete db;

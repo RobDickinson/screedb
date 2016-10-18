@@ -58,18 +58,31 @@ namespace screedb {
 #define NODE_KEYS 48                                       // maximum keys in tree nodes
 #define NODE_KEYS_MIDPOINT 24                              // halfway point within the node
 #define NODE_KEYS_UPPER 25                                 // index where upper half of keys begins
+#define SSO_CHARS 15                                       // chars for short string optimization
+#define SSO_SIZE 16                                        // sso chars plus null terminator
 
 struct ScreeDBOptions {
   // Nothing yet
 };
 
+class ScreeDBString {                                      // persistent string class
+public:                                                    // start public fields and methods
+  char* data() const;                                      // returns data as c-style string
+  void set(const Slice& slice);                            // copy data from c-style string
+  ScreeDBString& operator=(const Slice& slice);            // equals operator aliased to set()
+private:                                                   // start private fields and methods
+  char sso[SSO_SIZE];                                      // local storage for short strings
+  persistent_ptr<char[]> str;                              // pointer to storage for longer strings
+};
+
 struct ScreeDBLeaf {                                       // persistent leaves of the tree
   p<uint8_t> hashes[NODE_KEYS];                            // 48 bytes, Pearson hashes of keys
   persistent_ptr<ScreeDBLeaf> next;                        // 16 bytes, points to next leaf
-  persistent_ptr<char[]> kvs[NODE_KEYS];                   // contained key/value pairs
+  p<ScreeDBString> kv_keys[NODE_KEYS];                     // key strings stored in this leaf
+  p<ScreeDBString> kv_values[NODE_KEYS];                   // value strings stored in this leaf
 };
 
-struct ScreeDBRoot {
+struct ScreeDBRoot {                                       // persistent root object
   p<uint64_t> opened;                                      // number of times opened
   p<uint64_t> closed;                                      // number of times closed safely
   persistent_ptr<ScreeDBLeaf> head;                        // head of linked list of leaves
@@ -476,8 +489,6 @@ protected:
                           const Slice& key, const Slice& value);
   void LeafFillSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
                             const Slice& key, const Slice& value, const int slot);
-  void LeafFreeSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const Slice& key,
-                            const int slot);
   ScreeDBLeafNode* LeafSearch(const Slice& key);
   void LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
                  const Slice& key, const Slice& value);

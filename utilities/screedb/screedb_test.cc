@@ -76,12 +76,13 @@ private:
 // =============================================================================================
 
 TEST_F(ScreeDBTest, SizeofTest) {
-  // persistent structs
+  // persistent types
   ASSERT_TRUE(sizeof(ScreeDBRoot) == 32);
-  ASSERT_TRUE(sizeof(ScreeDBLeaf) == 832);
+  ASSERT_TRUE(sizeof(ScreeDBLeaf) == 3136);
   ASSERT_TRUE(sizeof_field(ScreeDBLeaf, hashes) + sizeof_field(ScreeDBLeaf, next) == 64);
+  ASSERT_TRUE(sizeof(ScreeDBString) == 32);
 
-  // volatile structs
+  // volatile types
   ASSERT_TRUE(sizeof(ScreeDBInnerNode) == 1992);
   ASSERT_TRUE(sizeof(ScreeDBLeafNode) == 40);
 }
@@ -113,6 +114,24 @@ TEST_F(ScreeDBTest, DeleteNonexistentTest) {
   ASSERT_TRUE(db->Delete(WriteOptions(), "nada").ok());
 }
 
+TEST_F(ScreeDBTest, EmptyKeyTest) {                                      // todo correct behavior?
+  ASSERT_TRUE(db->Put(WriteOptions(), "", "blah").ok());
+  std::string value;
+  ASSERT_TRUE(db->Get(ReadOptions(), "", &value).ok() && value == "blah");
+}
+
+TEST_F(ScreeDBTest, EmptyValueTest) {                                    // todo correct behavior?
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "").ok());
+  std::string value;
+  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &value).ok() && value == "");
+}
+
+TEST_F(ScreeDBTest, GetAppendToExternalValueTest) {
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "cool").ok());
+  std::string value = "super";
+  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &value).ok() && value == "supercool");
+}
+
 TEST_F(ScreeDBTest, GetHeadlessTest) {
   std::string value;
   ASSERT_TRUE(db->Get(ReadOptions(), "waldo", &value).IsNotFound());
@@ -134,6 +153,20 @@ TEST_F(ScreeDBTest, GetMultipleTest) {
   ASSERT_TRUE(db->Get(ReadOptions(), "jkl", &value4).ok() && value4 == "D4");
   std::string value5;
   ASSERT_TRUE(db->Get(ReadOptions(), "mno", &value5).ok() && value5 == "E5");
+}
+
+TEST_F(ScreeDBTest, GetMultipleAfterDeleteTest) {
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "key2", "value2").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "key3", "value3").ok());
+  ASSERT_TRUE(db->Delete(WriteOptions(), "key2").ok());
+  ASSERT_TRUE(db->Put(WriteOptions(), "key3", "VALUE3").ok());
+  std::string value1;
+  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &value1).ok() && value1 == "value1");
+  std::string value2;
+  ASSERT_TRUE(db->Get(ReadOptions(), "key2", &value2).IsNotFound());
+  std::string value3;
+  ASSERT_TRUE(db->Get(ReadOptions(), "key3", &value3).ok() && value3 == "VALUE3");
 }
 
 TEST_F(ScreeDBTest, GetNonexistentTest) {
@@ -167,33 +200,65 @@ TEST_F(ScreeDBTest, MultiGetTest) {
 }
 
 TEST_F(ScreeDBTest, PutExistingTest) {
-  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
   std::string value;
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
   ASSERT_TRUE(db->Get(ReadOptions(), "key1", &value).ok() && value == "value1");
-  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value_replaced").ok());
+
   std::string new_value;
-  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &new_value).ok() && new_value == "value_replaced");
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "VALUE1").ok());           // same length
+  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &new_value).ok() && new_value == "VALUE1");
+
+  std::string new_value2;
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "new_value").ok());        // longer length
+  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &new_value2).ok() && new_value2 == "new_value");
+
+  std::string new_value3;
+  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "?").ok());                // shorter length
+  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &new_value3).ok() && new_value3 == "?");
 }
 
-TEST_F(ScreeDBTest, PutLongStringsTest) {
-  std::string big = std::string("ABCDEFGHIJKLMNO QRSTUVWXYZ123:-()4567890ABCDEFGHIJKLMNO QRSTUVW");
-  ASSERT_TRUE(db->Put(WriteOptions(), big, big).ok());
+TEST_F(ScreeDBTest, PutKeysOfDifferentLengthsTest) {
   std::string value;
-  ASSERT_TRUE(db->Get(ReadOptions(), big, &value).ok() && value == big);
+  ASSERT_TRUE(db->Put(WriteOptions(), "123456789ABCDE", "A").ok());      // 2 under the sso limit
+  ASSERT_TRUE(db->Get(ReadOptions(), "123456789ABCDE", &value).ok() && value == "A");
+
+  std::string value2;
+  ASSERT_TRUE(db->Put(WriteOptions(), "123456789ABCDEF", "B").ok());     // 1 under the sso limit
+  ASSERT_TRUE(db->Get(ReadOptions(), "123456789ABCDEF", &value2).ok() && value2 == "B");
+
+  std::string value3;
+  ASSERT_TRUE(db->Put(WriteOptions(), "123456789ABCDEFG", "C").ok());    // at the sso limit
+  ASSERT_TRUE(db->Get(ReadOptions(), "123456789ABCDEFG", &value3).ok() && value3 == "C");
+
+  std::string value4;
+  ASSERT_TRUE(db->Put(WriteOptions(), "123456789ABCDEFGH", "D").ok());   // 1 over the sso limit
+  ASSERT_TRUE(db->Get(ReadOptions(), "123456789ABCDEFGH", &value4).ok() && value4 == "D");
+
+  std::string value5;
+  ASSERT_TRUE(db->Put(WriteOptions(), "123456789ABCDEFGHI", "E").ok());   // 2 over the sso limit
+  ASSERT_TRUE(db->Get(ReadOptions(), "123456789ABCDEFGHI", &value5).ok() && value5 == "E");
 }
 
-TEST_F(ScreeDBTest, UpdateTest) {
-  ASSERT_TRUE(db->Put(WriteOptions(), "key1", "value1").ok());
-  ASSERT_TRUE(db->Put(WriteOptions(), "key2", "value2").ok());
-  ASSERT_TRUE(db->Put(WriteOptions(), "key3", "value3").ok());
-  ASSERT_TRUE(db->Delete(WriteOptions(), "key2").ok());
-  ASSERT_TRUE(db->Put(WriteOptions(), "key3", "VALUE3").ok());
-  std::string value1;
-  ASSERT_TRUE(db->Get(ReadOptions(), "key1", &value1).ok() && value1 == "value1");
+TEST_F(ScreeDBTest, PutValuesOfDifferentLengthsTest) {
+  std::string value;
+  ASSERT_TRUE(db->Put(WriteOptions(), "A", "123456789ABCDE").ok());      // 2 under the sso limit
+  ASSERT_TRUE(db->Get(ReadOptions(), "A", &value).ok() && value == "123456789ABCDE");
+
   std::string value2;
-  ASSERT_TRUE(db->Get(ReadOptions(), "key2", &value2).IsNotFound());
+  ASSERT_TRUE(db->Put(WriteOptions(), "B", "123456789ABCDEF").ok());     // 1 under the sso limit
+  ASSERT_TRUE(db->Get(ReadOptions(), "B", &value2).ok() && value2 == "123456789ABCDEF");
+
   std::string value3;
-  ASSERT_TRUE(db->Get(ReadOptions(), "key3", &value3).ok() && value3 == "VALUE3");
+  ASSERT_TRUE(db->Put(WriteOptions(), "C", "123456789ABCDEFG").ok());    // at the sso limit
+  ASSERT_TRUE(db->Get(ReadOptions(), "C", &value3).ok() && value3 == "123456789ABCDEFG");
+
+  std::string value4;
+  ASSERT_TRUE(db->Put(WriteOptions(), "D", "123456789ABCDEFGH").ok());   // 1 over the sso limit
+  ASSERT_TRUE(db->Get(ReadOptions(), "D", &value4).ok() && value4 == "123456789ABCDEFGH");
+
+  std::string value5;
+  ASSERT_TRUE(db->Put(WriteOptions(), "E", "123456789ABCDEFGHI").ok());  // 2 over the sso limit
+  ASSERT_TRUE(db->Get(ReadOptions(), "E", &value5).ok() && value5 == "123456789ABCDEFGHI");
 }
 
 TEST_F(ScreeDBTest, WriteTest) {

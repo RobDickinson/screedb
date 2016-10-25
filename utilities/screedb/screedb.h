@@ -55,9 +55,11 @@ using nvml::obj::pool;
 namespace rocksdb {
 namespace screedb {
 
+#define INNER_KEYS 48                                      // maximum keys for inner nodes
+#define INNER_KEYS_MIDPOINT (INNER_KEYS / 2)               // halfway point within the node
+#define INNER_KEYS_UPPER ((INNER_KEYS / 2) + 1)            // index where upper half of keys begins
 #define NODE_KEYS 48                                       // maximum keys in tree nodes
 #define NODE_KEYS_MIDPOINT 24                              // halfway point within the node
-#define NODE_KEYS_UPPER 25                                 // index where upper half of keys begins
 #define SSO_CHARS 15                                       // chars for short string optimization
 #define SSO_SIZE 16                                        // sso chars plus null terminator
 
@@ -95,8 +97,8 @@ struct ScreeDBNode {                                       // volatile nodes of 
 
 struct ScreeDBInnerNode : ScreeDBNode {                    // volatile inner nodes of the tree
   uint8_t keycount;                                        // count of keys in this node
-  std::string keys[NODE_KEYS + 1];                         // child keys plus one overflow slot
-  ScreeDBNode* children[NODE_KEYS + 2];                    // child nodes plus one overflow slot
+  std::string keys[INNER_KEYS + 1];                        // child keys plus one overflow slot
+  ScreeDBNode* children[INNER_KEYS + 2];                   // child nodes plus one overflow slot
 };
 
 struct ScreeDBLeafNode : ScreeDBNode {                     // volatile leaf nodes of the tree

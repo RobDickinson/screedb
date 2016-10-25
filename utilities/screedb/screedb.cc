@@ -275,7 +275,7 @@ ScreeDBLeafNode* ScreeDB::LeafSearch(const Slice& key) {
   while (!node->is_leaf()) {
     bool matched = false;
     ScreeDBInnerNode* inner = (ScreeDBInnerNode*) node;
-    assert(inner == top_ || inner->keycount >= NODE_KEYS_MIDPOINT);
+    assert(inner == top_ || inner->keycount >= INNER_KEYS_MIDPOINT);
     for (uint8_t idx = 0; idx < inner->keycount; idx++) {
       node = inner->children[idx];
       if (key_string.compare(inner->keys[idx]) <= 0) {
@@ -361,21 +361,21 @@ void ScreeDB::LeafUpdateParentsAfterSplit(ScreeDBNode* node, ScreeDBNode* new_no
     inner->keycount = (uint8_t) (keycount + 1);
   }
   const uint8_t keycount = inner->keycount;
-  if (keycount <= NODE_KEYS) return;                                     // end recursion
+  if (keycount <= INNER_KEYS) return;                                    // end recursion
 
   // split inner node at the midpoint, update parents as needed
   auto new_inner = new ScreeDBInnerNode();                               // allocate new node
   new_inner->parent = inner->parent;                                     // set parent reference
-  for (int i = NODE_KEYS_UPPER; i < keycount; i++) {                     // copy all upper keys
-    new_inner->keys[i - NODE_KEYS_UPPER] = inner->keys[i];               // copy key string
+  for (int i = INNER_KEYS_UPPER; i < keycount; i++) {                    // copy all upper keys
+    new_inner->keys[i - INNER_KEYS_UPPER] = inner->keys[i];              // copy key string
   }
-  for (int i = NODE_KEYS_UPPER; i < keycount + 1; i++) {                 // copy all upper children
-    new_inner->children[i - NODE_KEYS_UPPER] = inner->children[i];       // copy child reference
-    new_inner->children[i - NODE_KEYS_UPPER]->parent = new_inner;        // set parent reference
+  for (int i = INNER_KEYS_UPPER; i < keycount + 1; i++) {                // copy all upper children
+    new_inner->children[i - INNER_KEYS_UPPER] = inner->children[i];      // copy child reference
+    new_inner->children[i - INNER_KEYS_UPPER]->parent = new_inner;       // set parent reference
   }
-  new_inner->keycount = NODE_KEYS_MIDPOINT;                              // always half the keys
-  std::string new_split_key = inner->keys[NODE_KEYS_MIDPOINT];           // save for recursion
-  inner->keycount = NODE_KEYS_MIDPOINT;                                  // half of keys remain
+  new_inner->keycount = INNER_KEYS_MIDPOINT;                             // always half the keys
+  std::string new_split_key = inner->keys[INNER_KEYS_MIDPOINT];          // save for recursion
+  inner->keycount = INNER_KEYS_MIDPOINT;                                 // half of keys remain
   LeafUpdateParentsAfterSplit(inner, new_inner, &new_split_key);         // recursive update
 }
 

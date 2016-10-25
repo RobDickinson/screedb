@@ -262,7 +262,6 @@ bool ScreeDB::LeafFillSlotForKey(const persistent_ptr<ScreeDBLeaf> leaf, const u
 
 void ScreeDB::LeafFillSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
                                    const Slice& key, const Slice& value, const int slot) {
-  assert(slot >= 0 && slot < NODE_KEYS);
   if (leaf->hashes[slot] == 0) leaf->kv_keys[slot].get_rw() = key.data_;
   leaf->hashes[slot] = hash;
   leaf->kv_values[slot].get_rw() = value.data_;
@@ -271,21 +270,20 @@ void ScreeDB::LeafFillSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const
 ScreeDBLeafNode* ScreeDB::LeafSearch(const Slice& key) {
   ScreeDBNode* node = top_;
   if (node == nullptr) return nullptr;
-  auto key_string = std::string(key.data_);
+  bool matched;
   while (!node->is_leaf()) {
-    bool matched = false;
+    matched = false;
     ScreeDBInnerNode* inner = (ScreeDBInnerNode*) node;
-    assert(inner == top_ || inner->keycount >= INNER_KEYS_MIDPOINT);
-    for (uint8_t idx = 0; idx < inner->keycount; idx++) {
+    const uint8_t keycount = inner->keycount;
+    for (uint8_t idx = 0; idx < keycount; idx++) {
       node = inner->children[idx];
-      if (key_string.compare(inner->keys[idx]) <= 0) {
+      if (strcmp(key.data_, inner->keys[idx].c_str()) <= 0) {
         matched = true;
         break;
       }
     }
-    if (!matched) node = inner->children[inner->keycount];
+    if (!matched) node = inner->children[keycount];
   }
-  assert(node->is_leaf());
   return (ScreeDBLeafNode*) node;
 }
 

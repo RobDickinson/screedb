@@ -503,7 +503,7 @@ protected:
   void Shutdown();
 
   // Helper methods
-  uint8_t PearsonHash(const char* data);
+  uint8_t PearsonHash(const char* data, const size_t size);
 
 private:
   const std::string dbname_;        // Name when constructed

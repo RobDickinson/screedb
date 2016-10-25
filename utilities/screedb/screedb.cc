@@ -92,7 +92,7 @@ Status ScreeDB::Delete(const WriteOptions& options, ColumnFamilyHandle* column_f
     LOG("   head not present");
     return Status::OK();
   }
-  const uint8_t hash = PearsonHash(key.data_);
+  const uint8_t hash = PearsonHash(key.data_, key.size_);
   auto leaf = leafnode->leaf;
   for (int slot = 0; slot < NODE_KEYS; slot++) {
     if (leaf->hashes[slot] == hash) {
@@ -119,7 +119,7 @@ Status ScreeDB::Get(const ReadOptions& options, ColumnFamilyHandle* column_famil
     LOG("   head not present");
     return Status::NotFound();
   }
-  const uint8_t hash = PearsonHash(key.data_);
+  const uint8_t hash = PearsonHash(key.data_, key.size_);
   auto leaf = leafnode->leaf;
   for (int slot = 0; slot < NODE_KEYS; slot++) {
     if (leaf->hashes[slot] == hash) {
@@ -162,7 +162,7 @@ std::vector<Status> ScreeDB::MultiGet(const ReadOptions& options,
 Status ScreeDB::Put(const WriteOptions& options, ColumnFamilyHandle* column_family,
                     const Slice& key, const Slice& value) {
   LOG("Put key=" << key.data_ << ", value=" << value.data_);
-  const uint8_t hash = PearsonHash(key.data_);
+  const uint8_t hash = PearsonHash(key.data_, key.size_);
 
   // add head leaf if none present
   auto leafnode = LeafSearch(key);
@@ -459,10 +459,9 @@ const uint8_t PEARSON_LOOKUP_TABLE[256] = {
 };
 
 // Modified Pearson hashing algorithm from RFC 3074
-uint8_t ScreeDB::PearsonHash(const char* data) {
-  size_t len = strlen(data);
-  uint8_t hash = (uint8_t) len;
-  for (size_t i = len; i > 0;) {  // todo first n chars instead?
+uint8_t ScreeDB::PearsonHash(const char* data, const size_t size) {
+  uint8_t hash = (uint8_t) size;
+  for (size_t i = size; i > 0;) {  // todo first n chars instead?
     hash = PEARSON_LOOKUP_TABLE[hash ^ data[--i]];
   }
 

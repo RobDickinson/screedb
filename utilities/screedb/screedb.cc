@@ -290,17 +290,17 @@ ScreeDBLeafNode* ScreeDB::LeafSearch(const Slice& key) {
 void ScreeDB::LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
                         const Slice& key, const Slice& value) {
   const auto leaf = leafnode->leaf;
-  std::string split_key;
-  { // find split key, the midpoint of all keys including new key
-    std::vector<std::string> keys(NODE_KEYS + 1);
-    for (int slot = 0; slot < NODE_KEYS; slot++) {
-      keys[slot] = (std::string(leaf->kv_keys[slot].get_ro().data()));
-    }
-    keys[NODE_KEYS] = std::string(key.data_);
-    std::sort(keys.begin(), keys.end());
-    split_key = keys[NODE_KEYS_MIDPOINT];
-    LOG("   splitting leaf at key=" << split_key);
-  }
+  const char* keys[NODE_KEYS + 1];                                       // temp array for sort
+  for (int slot = 0; slot < NODE_KEYS; slot++) {                         // iterate leaf slots
+    keys[slot] = leaf->kv_keys[slot].get_ro().data();                    // shallow pointer copy
+  }                                                                      // done iterating
+  keys[NODE_KEYS] = key.data_;                                           // copy new key pointer
+  std::sort(std::begin(keys), std::end(keys),                            // sort the key array
+            [](const char*& lhs, const char*& rhs) {                     // using closure method
+              return (strcmp(lhs, rhs) < 0);                             // comparing as c-strings
+            });                                                          // done with closure
+  std::string split_key = keys[NODE_KEYS_MIDPOINT];                      // read from the middle
+  LOG("   splitting leaf at key=" << split_key);
 
   // split leaf into two leaves, moving slots that sort above split key to new leaf
   persistent_ptr<ScreeDBLeaf> new_leaf;

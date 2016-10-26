@@ -55,7 +55,7 @@ using nvml::obj::pool;
 namespace rocksdb {
 namespace screedb {
 
-#define INNER_KEYS 48                                      // maximum keys for inner nodes
+#define INNER_KEYS 4                                       // maximum keys for inner nodes
 #define INNER_KEYS_MIDPOINT (INNER_KEYS / 2)               // halfway point within the node
 #define INNER_KEYS_UPPER ((INNER_KEYS / 2) + 1)            // index where upper half of keys begins
 #define NODE_KEYS 48                                       // maximum keys in tree nodes

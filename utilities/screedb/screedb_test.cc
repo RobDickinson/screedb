@@ -345,6 +345,8 @@ TEST_F(ScreeDBTest, MultipleLeafNodeAscendingTest) {
   for (int i = 10000; i <= (10000 + NODE_KEYS * 8); i++) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, istr).ok());
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
   for (int i = 10000; i <= (10000 + NODE_KEYS * 8); i++) {
     std::string istr = std::to_string(i);
@@ -357,6 +359,8 @@ TEST_F(ScreeDBTest, MultipleLeafNodeAscendingTest2) {
   for (int i = 1; i <= NODE_KEYS * 8; i++) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, istr).ok());
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
   for (int i = 1; i <= NODE_KEYS * 8; i++) {
     std::string istr = std::to_string(i);
@@ -369,6 +373,8 @@ TEST_F(ScreeDBTest, MultipleLeafNodeDescendingTest) {
   for (int i = (10000 + NODE_KEYS * 8); i >= 10000; i--) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, istr).ok());
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
   for (int i = (10000 + NODE_KEYS * 8); i >= 10000; i--) {
     std::string istr = std::to_string(i);
@@ -381,6 +387,8 @@ TEST_F(ScreeDBTest, MultipleLeafNodeDescendingTest2) {
   for (int i = NODE_KEYS * 8; i >= 1; i--) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, istr).ok());
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
   for (int i = NODE_KEYS * 8; i >= 1; i--) {
     std::string istr = std::to_string(i);
@@ -405,6 +413,8 @@ TEST_F(ScreeDBTest, NestedInnerNodeAscendingTest) {
   for (int i = 1; i <= 999999; i++) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, (istr + "!")).ok());
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == (istr + "!"));
   }
   for (int i = 1; i <= 999999; i++) {
     std::string istr = std::to_string(i);
@@ -417,6 +427,8 @@ TEST_F(ScreeDBTest, NestedInnerNodeDescendingTest) {
   for (int i = 999999; i >= 1; i--) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, ("ABC" + istr)).ok());
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == ("ABC" + istr));
   }
   for (int i = 999999; i >= 1; i--) {
     std::string istr = std::to_string(i);

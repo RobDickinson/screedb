@@ -350,8 +350,8 @@ void ScreeDB::LeafUpdateParentsAfterSplit(ScreeDBNode* node, ScreeDBNode* new_no
   ScreeDBInnerNode* inner = (ScreeDBInnerNode*) node->parent;
   { // insert split_key and new_node into inner node in sorted order
     const uint8_t keycount = inner->keycount;
-    int idx = -1;  // position where split_key should be inserted
-    while (idx < keycount) if (inner->keys[++idx].compare(*split_key) > 0) break;
+    int idx = 0;  // position where split_key should be inserted
+    while (idx < keycount && inner->keys[idx].compare(*split_key) <= 0) idx++;
     for (int i = keycount - 1; i >= idx; i--) inner->keys[i + 1] = inner->keys[i];
     for (int i = keycount; i >= idx; i--) inner->children[i + 1] = inner->children[i];
     inner->keys[idx] = *split_key;

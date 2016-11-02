@@ -91,7 +91,7 @@ struct ScreeDBRoot {                                       // persistent root ob
 };
 
 struct ScreeDBNode {                                       // volatile nodes of the tree
-  virtual bool is_leaf() { return false; }                 // assume inner node by default
+  bool is_leaf = false;                                    // indicate inner or leaf node
   ScreeDBNode* parent;                                     // parent of this node (null if top)
 };
 
@@ -102,7 +102,6 @@ struct ScreeDBInnerNode : ScreeDBNode {                    // volatile inner nod
 };
 
 struct ScreeDBLeafNode : ScreeDBNode {                     // volatile leaf nodes of the tree
-  virtual bool is_leaf() override { return true; }         // report these nodes as leaves
   persistent_ptr<ScreeDBLeaf> leaf;                        // pointer to persistent leaf
   bool lock;                                               // boolean modification lock
 };

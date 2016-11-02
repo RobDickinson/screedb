@@ -179,6 +179,7 @@ Status ScreeDB::Put(const WriteOptions& options, ColumnFamilyHandle* column_fami
     });
     leafnode = new ScreeDBLeafNode();
     leafnode->leaf = new_leaf;
+    leafnode->is_leaf = true;
     top_ = leafnode;
     return Status::OK();
   }
@@ -198,7 +199,7 @@ Status ScreeDB::Put(const WriteOptions& options, ColumnFamilyHandle* column_fami
 
 void ScreeDB::LeafDebugDump(ScreeDBNode* node) {
   if (DO_LOG) {
-    if (node->is_leaf()) {
+    if (node->is_leaf) {
       auto leaf = ((ScreeDBLeafNode*) node)->leaf;
       for (int slot = 0; slot < NODE_KEYS; slot++) {
         LOG("      " << std::to_string(slot) << "="
@@ -271,7 +272,7 @@ ScreeDBLeafNode* ScreeDB::LeafSearch(const Slice& key) {
   ScreeDBNode* node = top_;
   if (node == nullptr) return nullptr;
   bool matched;
-  while (!node->is_leaf()) {
+  while (!node->is_leaf) {
     matched = false;
     ScreeDBInnerNode* inner = (ScreeDBInnerNode*) node;
     const uint8_t keycount = inner->keycount;
@@ -327,6 +328,7 @@ void ScreeDB::LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
   auto new_leafnode = new ScreeDBLeafNode();
   new_leafnode->leaf = new_leaf;
   new_leafnode->parent = leafnode->parent;
+  new_leafnode->is_leaf = true;
   LeafUpdateParentsAfterSplit(leafnode, new_leafnode, &split_key);
 }
 
@@ -408,6 +410,7 @@ void ScreeDB::RebuildNodes() {
   while (true) {  // todo unbounded loop
     ScreeDBLeafNode* leafnode = new ScreeDBLeafNode();
     leafnode->leaf = leaf;
+    leafnode->is_leaf = true;
     if (first_leafnode == nullptr) first_leafnode = leafnode;
     if (leaf->next) {
       leaf = leaf->next;

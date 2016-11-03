@@ -76,12 +76,11 @@ void testPut(CLASS* db) {
 int main() {
   LOG("Opening database");
   Options options;
-  options.create_if_missing = true;  // todo option is ignored, see #7
+  options.create_if_missing = true;
   // options.IncreaseParallelism();
   // options.OptimizeLevelStyleCompaction();
-  ScreeDBOptions db_options;
   CLASS* db;
-  assert(CLASS::Open(options, db_options, PATH, &db).ok());
+  assert(CLASS::Open(options, PATH, &db).ok());
 
   // run some tests
   LOG("Inserting " << COUNT << " values");

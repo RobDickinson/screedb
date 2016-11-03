@@ -48,16 +48,14 @@ namespace rocksdb {
 namespace screedb {
 
 // Open database using specified configuration options and name.
-Status ScreeDB::Open(const Options& options, const ScreeDBOptions& dboptions,
-                     const std::string& dbname, ScreeDB** dbptr) {
-  ScreeDB* impl = new ScreeDB(options, dboptions, dbname);
+Status ScreeDB::Open(const Options& options, const std::string& dbname, ScreeDB** dbptr) {
+  ScreeDB* impl = new ScreeDB(options, dbname);
   *dbptr = impl;
   return Status::OK();
 }
 
 // Default constructor.
-ScreeDB::ScreeDB(const Options& options, const ScreeDBOptions& dboptions,
-                 const std::string& dbname) : dbname_(dbname) {
+ScreeDB::ScreeDB(const Options& options, const std::string& dbname) : dbname_(dbname) {
   LOG("Opening database");
   if (access(GetNamePtr(), F_OK) != 0) {
     LOG("Creating new persistent pool");

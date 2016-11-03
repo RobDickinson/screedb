@@ -38,7 +38,7 @@
 using namespace rocksdb;
 using namespace rocksdb::screedb;
 
-std::string kDBPath = "/dev/shm/screedb_test";
+const std::string PATH = "/dev/shm/screedb_test";
 
 int main(int argc, char* argv[]) {
   ::testing::InitGoogleTest(&argc, argv);
@@ -50,7 +50,7 @@ public:
   ScreeDB* db;
 
   ScreeDBTest() {
-    std::remove(kDBPath.c_str());
+    std::remove(PATH.c_str());
     Open();
   }
 
@@ -64,10 +64,8 @@ public:
 private:
   void Open() {
     Options options;
-    options.create_if_missing = true;  // todo options are ignored, see #7
-    ScreeDBOptions db_options;
-    Status s = ScreeDB::Open(options, db_options, kDBPath, &db);
-    assert(s.ok() && db->GetName() == kDBPath);
+    Status s = ScreeDB::Open(options, PATH, &db);
+    assert(s.ok() && db->GetName() == PATH);
   }
 };
 

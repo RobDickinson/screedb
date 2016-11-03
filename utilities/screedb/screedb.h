@@ -63,10 +63,6 @@ namespace screedb {
 #define SSO_CHARS 15                                       // chars for short string optimization
 #define SSO_SIZE 16                                        // sso chars plus null terminator
 
-struct ScreeDBOptions {
-  // Nothing yet
-};
-
 class ScreeDBString {                                      // persistent string class
 public:                                                    // start public fields and methods
   char* data() const;                                      // returns data as c-style string
@@ -109,8 +105,7 @@ struct ScreeDBLeafNode : ScreeDBNode {                     // volatile leaf node
 class ScreeDB : public DB {
 public:
   // Open database using specified configuration options and name.
-  static Status Open(const Options& options, const ScreeDBOptions& dboptions,
-                     const std::string& dbname, ScreeDB** dbptr);
+  static Status Open(const Options& options, const std::string& dbname, ScreeDB** dbptr);
 
   // Safely close the database.
   virtual ~ScreeDB();
@@ -479,7 +474,7 @@ public:
 
 protected:
   // Hide constructor, call Open() to create instead
-  ScreeDB(const Options& options, const ScreeDBOptions& dboptions, const std::string& dbname);
+  ScreeDB(const Options& options, const std::string& dbname);
 
   // Leaf methods
   void LeafDebugDump(ScreeDBNode* node);

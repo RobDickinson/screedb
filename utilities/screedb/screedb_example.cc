@@ -40,15 +40,13 @@
 using namespace rocksdb;
 using namespace rocksdb::screedb;
 
-std::string kDBPath = "/dev/shm/screedb_example";
+const std::string PATH = "/dev/shm/screedb_example";
 
 int main() {
   LOG("Opening database");
   Options options;
-  options.create_if_missing = true;  // todo option is ignored, see #7
-  ScreeDBOptions db_options;
   ScreeDB* db;
-  Status s = ScreeDB::Open(options, db_options, kDBPath, &db);
+  Status s = ScreeDB::Open(options, PATH, &db);
   assert(s.ok());
 
   LOG("Putting new value");

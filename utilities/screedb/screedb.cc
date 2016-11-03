@@ -62,7 +62,7 @@ ScreeDB::ScreeDB(const Options& options, const ScreeDBOptions& dboptions,
   if (access(GetNamePtr(), F_OK) != 0) {
     LOG("Creating new persistent pool");
     pop_ = pool<ScreeDBRoot>::create(GetNamePtr(), "ScreeDB",            // todo name is hardcoded
-                                     PMEMOBJ_MIN_POOL * 64, S_IRWXU);    // todo size is hardcoded
+                                     PMEMOBJ_MIN_POOL * 450, S_IRWXU);   // todo size is hardcoded
   } else {
     pop_ = pool<ScreeDBRoot>::open(GetNamePtr(), "ScreeDB");             // todo name is hardcoded
   }

@@ -41,9 +41,9 @@
 using namespace rocksdb;
 using namespace rocksdb::screedb;
 
-const std::string DB_PATH = "/dev/shm/screedb_stress";
-const std::string VALUE = "A";
-const unsigned long VALUES = 1000000;
+#define CLASS ScreeDB
+const unsigned long COUNT = 30000000;
+const std::string PATH = "/dev/shm/screedb_stress";
 
 unsigned long current_millis() {
   struct timeval tv;
@@ -51,22 +51,25 @@ unsigned long current_millis() {
   return (unsigned long long) (tv.tv_sec) * 1000 + (unsigned long long) (tv.tv_usec) / 1000;
 }
 
-void testDelete(ScreeDB* db) {
+void testDelete(CLASS* db) {
   auto started = current_millis();
-  for (int i = 0; i < VALUES; i++) assert(db->Delete(WriteOptions(), std::to_string(i)).ok());
+  for (int i = 0; i < COUNT; i++) assert(db->Delete(WriteOptions(), std::to_string(i)).ok());
   LOG("   in " << current_millis() - started << " ms");
 }
 
-void testGet(ScreeDB* db) {
+void testGet(CLASS* db) {
   auto started = current_millis();
   std::string value;
-  for (int i = 0; i < VALUES; i++) assert(db->Get(ReadOptions(), std::to_string(i), &value).ok());
+  for (int i = 0; i < COUNT; i++) assert(db->Get(ReadOptions(), std::to_string(i), &value).ok());
   LOG("   in " << current_millis() - started << " ms");
 }
 
-void testPut(ScreeDB* db) {
+void testPut(CLASS* db) {
   auto started = current_millis();
-  for (int i = 0; i < VALUES; i++) assert(db->Put(WriteOptions(), std::to_string(i), VALUE).ok());
+  for (int i = 0; i < COUNT; i++) {
+    auto str = std::to_string(i);
+    assert(db->Put(WriteOptions(), str, str).ok());
+  }
   LOG("   in " << current_millis() - started << " ms");
 }
 
@@ -74,20 +77,22 @@ int main() {
   LOG("Opening database");
   Options options;
   options.create_if_missing = true;  // todo option is ignored, see #7
+  // options.IncreaseParallelism();
+  // options.OptimizeLevelStyleCompaction();
   ScreeDBOptions db_options;
-  ScreeDB* db;
-  assert(ScreeDB::Open(options, db_options, DB_PATH, &db).ok());
+  CLASS* db;
+  assert(CLASS::Open(options, db_options, PATH, &db).ok());
 
   // run some tests
-  LOG("Inserting " << VALUES << " values");
+  LOG("Inserting " << COUNT << " values");
   testPut(db);
-  LOG("Getting " << VALUES << " values");
+  LOG("Getting " << COUNT << " values");
   testGet(db);
-  LOG("Updating " << VALUES << " values");
+  LOG("Updating " << COUNT << " values");
   testPut(db);
-  LOG("Deleting " << VALUES << " values");
+  LOG("Deleting " << COUNT << " values");
   testDelete(db);
-  LOG("Reinserting " << VALUES << " values");
+  LOG("Reinserting " << COUNT << " values");
   testPut(db);
 
   LOG("Closing database");

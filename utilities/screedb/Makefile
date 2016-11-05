@@ -20,7 +20,7 @@ test:
 stress:
 	$(CXX) $(CXXFLAGS) screedb.cc screedb_stress.cc -o screedb_stress ../../librocksdb.a \
 	/usr/local/lib/libpmemobj.a /usr/local/lib/libpmem.a -I../../include \
-	-O2 -std=c++11 -ldl $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
+	-DNDEBUG -O2 -std=c++11 -ldl $(PLATFORM_LDFLAGS) $(PLATFORM_CXXFLAGS) $(EXEC_LDFLAGS)
 	rm -rf /dev/shm/screedb_stress
 	PMEM_IS_PMEM_FORCE=1 ./screedb_stress
 

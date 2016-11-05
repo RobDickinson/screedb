@@ -53,22 +53,22 @@ unsigned long current_millis() {
 
 void testDelete(CLASS* db) {
   auto started = current_millis();
-  for (int i = 0; i < COUNT; i++) assert(db->Delete(WriteOptions(), std::to_string(i)).ok());
+  for (int i = 0; i < COUNT; i++) { db->Delete(WriteOptions(), std::to_string(i)); }
   LOG("   in " << current_millis() - started << " ms");
 }
 
 void testGet(CLASS* db) {
   auto started = current_millis();
   std::string value;
-  for (int i = 0; i < COUNT; i++) assert(db->Get(ReadOptions(), std::to_string(i), &value).ok());
+  for (int i = 0; i < COUNT; i++) { db->Get(ReadOptions(), std::to_string(i), &value); }
   LOG("   in " << current_millis() - started << " ms");
 }
 
 void testPut(CLASS* db) {
   auto started = current_millis();
   for (int i = 0; i < COUNT; i++) {
-    auto str = std::to_string(i);
-    assert(db->Put(WriteOptions(), str, str).ok());
+    std::string str = std::to_string(i);
+    db->Put(WriteOptions(), str, str);
   }
   LOG("   in " << current_millis() - started << " ms");
 }
@@ -80,7 +80,7 @@ int main() {
   // options.IncreaseParallelism();
   // options.OptimizeLevelStyleCompaction();
   CLASS* db;
-  assert(CLASS::Open(options, PATH, &db).ok());
+  CLASS::Open(options, PATH, &db);
 
   // run some tests
   LOG("Inserting " << COUNT << " values");

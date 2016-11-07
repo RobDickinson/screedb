@@ -41,9 +41,9 @@
 using namespace rocksdb;
 using namespace rocksdb::screedb;
 
-#define CLASS ScreeDB
-const unsigned long COUNT = 30000000;
-const std::string PATH = "/dev/shm/screedb_stress";
+#define CLASS ScreeDB                                                    // "ScreeDB" or "DB"
+const unsigned long COUNT = 30000000;                                    // ops per test phase
+const std::string PATH = "/dev/shm/screedb_stress";                      // use shared memory
 
 unsigned long current_millis() {
   struct timeval tv;
@@ -51,20 +51,20 @@ unsigned long current_millis() {
   return (unsigned long long) (tv.tv_sec) * 1000 + (unsigned long long) (tv.tv_usec) / 1000;
 }
 
-void testDelete(CLASS* db) {
+void testDelete(DB* db) {
   auto started = current_millis();
   for (int i = 0; i < COUNT; i++) { db->Delete(WriteOptions(), std::to_string(i)); }
   LOG("   in " << current_millis() - started << " ms");
 }
 
-void testGet(CLASS* db) {
+void testGet(DB* db) {
   auto started = current_millis();
   std::string value;
   for (int i = 0; i < COUNT; i++) { db->Get(ReadOptions(), std::to_string(i), &value); }
   LOG("   in " << current_millis() - started << " ms");
 }
 
-void testPut(CLASS* db) {
+void testPut(DB* db) {
   auto started = current_millis();
   for (int i = 0; i < COUNT; i++) {
     std::string str = std::to_string(i);
@@ -77,12 +77,11 @@ int main() {
   LOG("Opening database");
   Options options;
   options.create_if_missing = true;
-  // options.IncreaseParallelism();
-  // options.OptimizeLevelStyleCompaction();
+  options.IncreaseParallelism();
+  options.OptimizeLevelStyleCompaction();
   CLASS* db;
   CLASS::Open(options, PATH, &db);
 
-  // run some tests
   LOG("Inserting " << COUNT << " values");
   testPut(db);
   LOG("Getting " << COUNT << " values");
@@ -96,7 +95,6 @@ int main() {
 
   LOG("Closing database");
   delete db;
-
   LOG("Finished successfully");
   return 0;
 }

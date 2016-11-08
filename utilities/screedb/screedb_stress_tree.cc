@@ -30,50 +30,63 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Simple example for RocksDB database using NVML backend.
+// Stress test for persistent tree using NVML backend.
 
 #include <iostream>
+#include <sys/time.h>
 #include "screedb.h"
 
 #define LOG(msg) std::cout << msg << "\n"
 
-using namespace rocksdb;
 using namespace rocksdb::screedb;
 
-int main() {
-  LOG("Opening database");
-  Options options;
-  ScreeDB* db;
-  Status s = ScreeDB::Open(options, "/dev/shm/screedb", &db);
-  assert(s.ok());
+const unsigned long COUNT = 30000000;
 
-  LOG("Putting new value");
-  s = db->Put(WriteOptions(), "key1", "value1");
-  assert(s.ok());
+unsigned long current_millis() {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  return (unsigned long long) (tv.tv_sec) * 1000 + (unsigned long long) (tv.tv_usec) / 1000;
+}
+
+void testDelete(ScreeDBTree* impl) {
+  auto started = current_millis();
+  for (int i = 0; i < COUNT; i++) { impl->Delete(std::to_string(i)); }
+  LOG("   in " << current_millis() - started << " ms");
+}
+
+void testGet(ScreeDBTree* impl) {
+  auto started = current_millis();
   std::string value;
-  s = db->Get(ReadOptions(), "key1", &value);
-  assert(s.ok() && value == "value1");
+  for (int i = 0; i < COUNT; i++) { impl->Get(std::to_string(i), &value); }
+  LOG("   in " << current_millis() - started << " ms");
+}
 
-  LOG("Replacing existing value");
-  std::string value2;
-  s = db->Get(ReadOptions(), "key1", &value2);
-  assert(s.ok() && value2 == "value1");
-  s = db->Put(WriteOptions(), "key1", "value_replaced");
-  assert(s.ok());
-  std::string value3;
-  s = db->Get(ReadOptions(), "key1", &value3);
-  assert(s.ok() && value3 == "value_replaced");
+void testPut(ScreeDBTree* impl) {
+  auto started = current_millis();
+  for (int i = 0; i < COUNT; i++) {
+    std::string str = std::to_string(i);
+    impl->Put(str, str);
+  }
+  LOG("   in " << current_millis() - started << " ms");
+}
 
-  LOG("Deleting existing value");
-  s = db->Delete(WriteOptions(), "key1");
-  assert(s.ok());
-  std::string value4;
-  s = db->Get(ReadOptions(), "key1", &value4);
-  assert(s.IsNotFound());
+int main() {
+  LOG("Opening");
+  ScreeDBTree* impl = new ScreeDBTree("/dev/shm/screedb");
 
-  LOG("Closing database");
-  delete db;
+  LOG("Inserting " << COUNT << " values");
+  testPut(impl);
+  LOG("Getting " << COUNT << " values");
+  testGet(impl);
+  LOG("Updating " << COUNT << " values");
+  testPut(impl);
+  LOG("Deleting " << COUNT << " values");
+  testDelete(impl);
+  LOG("Reinserting " << COUNT << " values");
+  testPut(impl);
 
-  LOG("Finished successfully");
+  LOG("Closing");
+  delete impl;
+  LOG("Finished");
   return 0;
 }

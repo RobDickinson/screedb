@@ -102,7 +102,44 @@ struct ScreeDBLeafNode : ScreeDBNode {                     // volatile leaf node
   bool lock;                                               // boolean modification lock
 };
 
-class ScreeDB : public DB {
+class ScreeDBTree {                                        // persistent tree implementation
+public:
+  ScreeDBTree(const std::string& name);
+  ~ScreeDBTree();
+  const std::string& GetName() const { return name; }
+  const char* GetNamePtr() const { return name.c_str(); }
+  Status Delete(const Slice& key);
+  Status Get(const Slice& key, std::string* value);
+  std::vector<Status> MultiGet(const std::vector<Slice>& keys,
+                               std::vector<std::string>* values);
+  Status Put(const Slice& key, const Slice& value);
+protected:
+  void LeafDebugDump(ScreeDBNode* node);
+  void LeafDebugDumpWithChildren(ScreeDBInnerNode* inner);
+  void LeafFillFirstEmptySlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+                              const Slice& key, const Slice& value);
+  bool LeafFillSlotForKey(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+                          const Slice& key, const Slice& value);
+  void LeafFillSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+                            const Slice& key, const Slice& value, const int slot);
+  ScreeDBLeafNode* LeafSearch(const Slice& key);
+  void LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
+                 const Slice& key, const Slice& value);
+  void LeafUpdateParentsAfterSplit(ScreeDBNode* node, ScreeDBNode* new_node,
+                                   std::string* split_key);
+  uint8_t PearsonHash(const char* data, const size_t size);
+  void RebuildNodes();
+  void Recover();
+  void Shutdown();
+private:
+  ScreeDBTree(const ScreeDBTree&);                         // prevent copying
+  void operator=(const ScreeDBTree&);                      // prevent assignment
+  const std::string name;                                  // name when constructed
+  pool<ScreeDBRoot> pop_;                                  // pool for persistent root
+  ScreeDBNode* top_ = nullptr;                             // top of volatile tree
+};
+
+class ScreeDB : public DB {                                // RocksDB API on persistent tree
 public:
   // Open database using specified configuration options and name.
   static Status Open(const Options& options, const std::string& dbname, ScreeDB** dbptr);
@@ -118,14 +155,18 @@ public:
   // on error.  It is not an error if "key" did not exist in the database.
   using DB::Delete;
   virtual Status Delete(const WriteOptions& options, ColumnFamilyHandle* column_family,
-                        const Slice& key) override;
+                        const Slice& key) override {
+    return dbtree->Delete(key);
+  }
 
   // If the database contains an entry for "key" store the corresponding value in *value
   // and return OK. If there is no entry for "key" leave *value unchanged and return a status
   // for which Status::IsNotFound() returns true. May return some other Status on an error.
   using DB::Get;
   virtual Status Get(const ReadOptions& options, ColumnFamilyHandle* column_family,
-                     const Slice& key, std::string* value) override;
+                     const Slice& key, std::string* value) override {
+    return dbtree->Get(key, value);
+  }
 
   // If the key definitely does not exist in the database, then this method returns false,
   // else true. If the caller wants to obtain value when the key is found in memory, a bool
@@ -158,13 +199,17 @@ public:
   virtual std::vector<Status> MultiGet(const ReadOptions& options,
                                        const std::vector<ColumnFamilyHandle*>& column_family,
                                        const std::vector<Slice>& keys,
-                                       std::vector<std::string>* values) override;
+                                       std::vector<std::string>* values) override {
+    return dbtree->MultiGet(keys, values);
+  }
 
   // Set the database entry for "key" to "value". If "key" already exists, it will be overwritten.
   // Returns OK on success, and a non-OK status on error.
   using DB::Put;
   virtual Status Put(const WriteOptions& options, ColumnFamilyHandle* column_family,
-                     const Slice& key, const Slice& value) override;
+                     const Slice& key, const Slice& value) override {
+    return dbtree->Put(key, value);
+  }
 
   // Remove the database entry for "key". Requires that the key exists and was not overwritten.
   // Returns OK on success, and a non-OK status on error.  It is not an error if "key" did not
@@ -335,10 +380,10 @@ public:
   virtual Env* GetEnv() const override { return nullptr; }
 
   // Get DB name -- the exact same name that was provided as an argument to DB::Open().
-  virtual const std::string& GetName() const override { return dbname_; }
+  virtual const std::string& GetName() const override { return dbname; }
 
   // Return pointer to DB name -- same name that was provided as an argument to DB::Open().
-  virtual const char* GetNamePtr() const { return dbname_.c_str(); }
+  virtual const char* GetNamePtr() const { return dbname.c_str(); }
 
   // Get options in use.  During the process of opening the column family, the options
   // provided when calling DB::Open() or DB::CreateColumnFamily() will have been "sanitized"
@@ -349,7 +394,7 @@ public:
     return *options;
   }
   using DB::GetDBOptions;
-  virtual const DBOptions& GetDBOptions() const override { return dboptions_; }
+  virtual const DBOptions& GetDBOptions() const override { return dboptions; }
 
   // Number of files in level-0 that would stop writes.
   using DB::Level0StopWriteTrigger;
@@ -476,37 +521,12 @@ protected:
   // Hide constructor, call Open() to create instead
   ScreeDB(const Options& options, const std::string& dbname);
 
-  // Leaf methods
-  void LeafDebugDump(ScreeDBNode* node);
-  void LeafDebugDumpWithChildren(ScreeDBInnerNode* inner);
-  void LeafFillFirstEmptySlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
-                              const Slice& key, const Slice& value);
-  bool LeafFillSlotForKey(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
-                          const Slice& key, const Slice& value);
-  void LeafFillSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
-                            const Slice& key, const Slice& value, const int slot);
-  ScreeDBLeafNode* LeafSearch(const Slice& key);
-  void LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
-                 const Slice& key, const Slice& value);
-  void LeafUpdateParentsAfterSplit(ScreeDBNode* node, ScreeDBNode* new_node,
-                                   std::string* split_key);
-
-  // Lifecycle methods
-  void Recover();
-  void RebuildNodes();
-  void Shutdown();
-
-  // Helper methods
-  uint8_t PearsonHash(const char* data, const size_t size);
-
 private:
-  const std::string dbname_;        // Name when constructed
-  const DBOptions dboptions_;       // Options when constructed
-  pool<ScreeDBRoot> pop_;           // Pool for persistent root
-  ScreeDBNode* top_ = nullptr;      // Pointer to top/middle of volatile tree
-
-  ScreeDB(const ScreeDB&);          // Prevent copying
-  void operator=(const ScreeDB&);   // Prevent assignment
+  ScreeDB(const ScreeDB&);                                               // prevent copying
+  void operator=(const ScreeDB&);                                        // prevent assignment
+  const std::string dbname;                                              // name when opened
+  const DBOptions dboptions;                                             // options when opened
+  ScreeDBTree* dbtree;                                                   // persistent tree
 };
 
 } // namespace screedb

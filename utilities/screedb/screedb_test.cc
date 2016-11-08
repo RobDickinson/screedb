@@ -30,7 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Unit tests for RocksDB database using NVML backend in place of LSM.
+// Unit tests for RocksDB database using NVML backend.
 
 #include "screedb.h"
 #include "gtest/gtest.h"
@@ -38,7 +38,7 @@
 using namespace rocksdb;
 using namespace rocksdb::screedb;
 
-const std::string PATH = "/dev/shm/screedb_test";
+const std::string PATH = "/dev/shm/screedb";
 
 int main(int argc, char* argv[]) {
   ::testing::InitGoogleTest(&argc, argv);

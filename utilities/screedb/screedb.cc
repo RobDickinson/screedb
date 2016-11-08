@@ -47,33 +47,39 @@
 namespace rocksdb {
 namespace screedb {
 
-// Open database using specified configuration options and name.
+// Static factory for RocksDB-compatible persistent trees
 Status ScreeDB::Open(const Options& options, const std::string& dbname, ScreeDB** dbptr) {
-  ScreeDB* impl = new ScreeDB(options, dbname);
-  *dbptr = impl;
+  *dbptr = new ScreeDB(options, dbname);
   return Status::OK();
 }
 
-// Default constructor.
-ScreeDB::ScreeDB(const Options& options, const std::string& dbname) : dbname_(dbname) {
-  LOG("Opening database");
+// Construct a RocksDB-compatible persistent tree
+ScreeDB::ScreeDB(const Options& options, const std::string& name)
+        : dbname(name), dboptions(options) { dbtree = new ScreeDBTree(dbname); }
+
+// Safely free a RocksDB-compatible persistent tree
+ScreeDB::~ScreeDB() { delete dbtree; }
+
+// Construct a persistent tree
+ScreeDBTree::ScreeDBTree(const std::string& name) : name(name) {
+  LOG("Opening persistent tree");
   if (access(GetNamePtr(), F_OK) != 0) {
-    LOG("Creating new persistent pool");
+    LOG("Creating pool");
     pop_ = pool<ScreeDBRoot>::create(GetNamePtr(), "ScreeDB",            // todo name is hardcoded
                                      PMEMOBJ_MIN_POOL * 450, S_IRWXU);   // todo size is hardcoded
   } else {
     pop_ = pool<ScreeDBRoot>::open(GetNamePtr(), "ScreeDB");             // todo name is hardcoded
   }
   Recover();
-  LOG("Opened database ok");
+  LOG("Opened tree ok");
 }
 
-// Safely close the database.
-ScreeDB::~ScreeDB() {
-  LOG("Closing database");
+// Safely free a persistent tree
+ScreeDBTree::~ScreeDBTree() {
+  LOG("Closing tree");
   Shutdown();
   pop_.close();
-  LOG("Closed database ok");
+  LOG("Closed tree ok");
 }
 
 // ===============================================================================================
@@ -82,8 +88,7 @@ ScreeDB::~ScreeDB() {
 
 // Remove the database entry (if any) for "key".  Returns OK on success, and a non-OK status
 // on error.  It is not an error if "key" did not exist in the database.
-Status ScreeDB::Delete(const WriteOptions& options, ColumnFamilyHandle* column_family,
-                       const Slice& key) {
+Status ScreeDBTree::Delete(const Slice& key) {
   LOG("Delete key=" << key.data_);
   auto leafnode = LeafSearch(key);
   if (!leafnode) {
@@ -109,8 +114,7 @@ Status ScreeDB::Delete(const WriteOptions& options, ColumnFamilyHandle* column_f
 // If the database contains an entry for "key" store the corresponding value in *value
 // and return OK. If there is no entry for "key" leave *value unchanged and return a status
 // for which Status::IsNotFound() returns true. May return some other Status on an error.
-Status ScreeDB::Get(const ReadOptions& options, ColumnFamilyHandle* column_family,
-                    const Slice& key, std::string* value) {
+Status ScreeDBTree::Get(const Slice& key, std::string* value) {
   LOG("Get key=" << key.data_);
   auto leafnode = LeafSearch(key);
   if (!leafnode) {
@@ -139,15 +143,13 @@ Status ScreeDB::Get(const ReadOptions& options, ColumnFamilyHandle* column_famil
 // (*values) will always be resized to be the same size as (keys).
 // Similarly, the number of returned statuses will be the number of keys.
 // Note: keys will not be "de-duplicated". Duplicate keys will return duplicate values in order.
-std::vector<Status> ScreeDB::MultiGet(const ReadOptions& options,
-                                      const std::vector<ColumnFamilyHandle*>& column_family,
-                                      const std::vector<Slice>& keys,
-                                      std::vector<std::string>* values) {
+std::vector<Status> ScreeDBTree::MultiGet(const std::vector<Slice>& keys,
+                                          std::vector<std::string>* values) {
   LOG("MultiGet for " << keys.size() << " keys");
   std::vector<Status> status = std::vector<Status>();
   for (auto& key: keys) {
     std::string value;
-    Status s = Get(options, key.data_, &value);
+    Status s = Get(key.data_, &value);
     status.push_back(s);
     values->push_back(s.ok() ? value : "");
   }
@@ -157,8 +159,7 @@ std::vector<Status> ScreeDB::MultiGet(const ReadOptions& options,
 
 // Set the database entry for "key" to "value". If "key" already exists, it will be overwritten.
 // Returns OK on success, and a non-OK status on error.
-Status ScreeDB::Put(const WriteOptions& options, ColumnFamilyHandle* column_family,
-                    const Slice& key, const Slice& value) {
+Status ScreeDBTree::Put(const Slice& key, const Slice& value) {
   LOG("Put key=" << key.data_ << ", value=" << value.data_);
   const uint8_t hash = PearsonHash(key.data_, key.size_);
 
@@ -195,7 +196,7 @@ Status ScreeDB::Put(const WriteOptions& options, ColumnFamilyHandle* column_fami
 // PROTECTED LEAF METHODS
 // ===============================================================================================
 
-void ScreeDB::LeafDebugDump(ScreeDBNode* node) {
+void ScreeDBTree::LeafDebugDump(ScreeDBNode* node) {
   if (DO_LOG) {
     if (node->is_leaf) {
       auto leaf = ((ScreeDBLeafNode*) node)->leaf;
@@ -213,7 +214,7 @@ void ScreeDB::LeafDebugDump(ScreeDBNode* node) {
   }
 }
 
-void ScreeDB::LeafDebugDumpWithChildren(ScreeDBInnerNode* inner) {
+void ScreeDBTree::LeafDebugDumpWithChildren(ScreeDBInnerNode* inner) {
   LeafDebugDump(inner);
   for (int i = 0; i < inner->keycount + 1; i++) {
     LOG ("      dumping child node " << std::to_string(i) << "------------------------");
@@ -221,8 +222,8 @@ void ScreeDB::LeafDebugDumpWithChildren(ScreeDBInnerNode* inner) {
   }
 }
 
-void ScreeDB::LeafFillFirstEmptySlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
-                                     const Slice& key, const Slice& value) {
+void ScreeDBTree::LeafFillFirstEmptySlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+                                         const Slice& key, const Slice& value) {
   for (int slot = 0; slot < NODE_KEYS; slot++) {
     if (leaf->hashes[slot] == 0) {
       LeafFillSpecificSlot(leaf, hash, key, value, slot);
@@ -231,8 +232,8 @@ void ScreeDB::LeafFillFirstEmptySlot(const persistent_ptr<ScreeDBLeaf> leaf, con
   }
 }
 
-bool ScreeDB::LeafFillSlotForKey(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
-                                 const Slice& key, const Slice& value) {
+bool ScreeDBTree::LeafFillSlotForKey(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+                                     const Slice& key, const Slice& value) {
   // scan for empty/matching slots
   int first_empty_slot = -1;
   int key_match_slot = -1;
@@ -259,14 +260,14 @@ bool ScreeDB::LeafFillSlotForKey(const persistent_ptr<ScreeDBLeaf> leaf, const u
   return slot >= 0;
 }
 
-void ScreeDB::LeafFillSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
-                                   const Slice& key, const Slice& value, const int slot) {
+void ScreeDBTree::LeafFillSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+                                       const Slice& key, const Slice& value, const int slot) {
   if (leaf->hashes[slot] == 0) leaf->kv_keys[slot].get_rw() = key.data_;
   leaf->hashes[slot] = hash;
   leaf->kv_values[slot].get_rw() = value.data_;
 }
 
-ScreeDBLeafNode* ScreeDB::LeafSearch(const Slice& key) {
+ScreeDBLeafNode* ScreeDBTree::LeafSearch(const Slice& key) {
   ScreeDBNode* node = top_;
   if (node == nullptr) return nullptr;
   bool matched;
@@ -286,8 +287,8 @@ ScreeDBLeafNode* ScreeDB::LeafSearch(const Slice& key) {
   return (ScreeDBLeafNode*) node;
 }
 
-void ScreeDB::LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
-                        const Slice& key, const Slice& value) {
+void ScreeDBTree::LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
+                            const Slice& key, const Slice& value) {
   const auto leaf = leafnode->leaf;
   const char* keys[NODE_KEYS + 1];                                       // temp array for sort
   for (int slot = 0; slot < NODE_KEYS; slot++) {                         // iterate leaf slots
@@ -330,8 +331,8 @@ void ScreeDB::LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
   LeafUpdateParentsAfterSplit(leafnode, new_leafnode, &split_key);
 }
 
-void ScreeDB::LeafUpdateParentsAfterSplit(ScreeDBNode* node, ScreeDBNode* new_node,
-                                          std::string* split_key) {
+void ScreeDBTree::LeafUpdateParentsAfterSplit(ScreeDBNode* node, ScreeDBNode* new_node,
+                                              std::string* split_key) {
   if (!node->parent) {
     LOG("   creating new top node for split_key=" << *split_key);
     auto top = new ScreeDBInnerNode();
@@ -381,8 +382,8 @@ void ScreeDB::LeafUpdateParentsAfterSplit(ScreeDBNode* node, ScreeDBNode* new_no
 // PROTECTED LIFECYCLE METHODS
 // ===============================================================================================
 
-void ScreeDB::Recover() {
-  LOG("Recovering database");
+void ScreeDBTree::Recover() {
+  LOG("Recovering tree");
   auto root = pop_.get_root();
   if (!root->head) {
     LOG("   creating root");
@@ -396,10 +397,10 @@ void ScreeDB::Recover() {
     RebuildNodes();
     transaction::exec_tx(pop_, [&] { root->opened = root->opened + 1; });
   }
-  LOG("Recovered database ok");
+  LOG("Recovered tree ok");
 }
 
-void ScreeDB::RebuildNodes() {
+void ScreeDBTree::RebuildNodes() {
   LOG("   rebuilding nodes");
 
   // traverse persistent leaves to build volatile leaf nodes
@@ -425,11 +426,11 @@ void ScreeDB::RebuildNodes() {
   LOG("   rebuilt nodes ok");
 }
 
-void ScreeDB::Shutdown() {
-  LOG("Shutting down database");
+void ScreeDBTree::Shutdown() {
+  LOG("Shutting down tree");
   auto root = pop_.get_root();
   transaction::exec_tx(pop_, [&] { root->closed = root->closed + 1; });
-  LOG("Shut down database ok");
+  LOG("Shut down tree ok");
 }
 
 // ===============================================================================================
@@ -458,7 +459,7 @@ const uint8_t PEARSON_LOOKUP_TABLE[256] = {
 };
 
 // Modified Pearson hashing algorithm from RFC 3074
-uint8_t ScreeDB::PearsonHash(const char* data, const size_t size) {
+uint8_t ScreeDBTree::PearsonHash(const char* data, const size_t size) {
   uint8_t hash = (uint8_t) size;
   for (size_t i = size; i > 0;) {  // todo first n chars instead?
     hash = PEARSON_LOOKUP_TABLE[hash ^ data[--i]];

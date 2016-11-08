@@ -30,7 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Stress test for RocksDB database using NVML backend in place of LSM tree.
+// Stress test for RocksDB database using NVML backend.
 
 #include <iostream>
 #include <sys/time.h>
@@ -41,9 +41,8 @@
 using namespace rocksdb;
 using namespace rocksdb::screedb;
 
-#define CLASS ScreeDB                                                    // "ScreeDB" or "DB"
-const unsigned long COUNT = 30000000;                                    // ops per test phase
-const std::string PATH = "/dev/shm/screedb_stress";                      // use shared memory
+#define CLASS ScreeDB                    // "ScreeDB" or "DB"
+const unsigned long COUNT = 30000000;    // 1M or 30M or 90M
 
 unsigned long current_millis() {
   struct timeval tv;
@@ -51,50 +50,50 @@ unsigned long current_millis() {
   return (unsigned long long) (tv.tv_sec) * 1000 + (unsigned long long) (tv.tv_usec) / 1000;
 }
 
-void testDelete(DB* db) {
+void testDelete(DB* impl) {
   auto started = current_millis();
-  for (int i = 0; i < COUNT; i++) { db->Delete(WriteOptions(), std::to_string(i)); }
+  for (int i = 0; i < COUNT; i++) { impl->Delete(WriteOptions(), std::to_string(i)); }
   LOG("   in " << current_millis() - started << " ms");
 }
 
-void testGet(DB* db) {
+void testGet(DB* impl) {
   auto started = current_millis();
   std::string value;
-  for (int i = 0; i < COUNT; i++) { db->Get(ReadOptions(), std::to_string(i), &value); }
+  for (int i = 0; i < COUNT; i++) { impl->Get(ReadOptions(), std::to_string(i), &value); }
   LOG("   in " << current_millis() - started << " ms");
 }
 
-void testPut(DB* db) {
+void testPut(DB* impl) {
   auto started = current_millis();
   for (int i = 0; i < COUNT; i++) {
     std::string str = std::to_string(i);
-    db->Put(WriteOptions(), str, str);
+    impl->Put(WriteOptions(), str, str);
   }
   LOG("   in " << current_millis() - started << " ms");
 }
 
 int main() {
-  LOG("Opening database");
+  LOG("Opening");
   Options options;
   options.create_if_missing = true;
   options.IncreaseParallelism();
   options.OptimizeLevelStyleCompaction();
-  CLASS* db;
-  CLASS::Open(options, PATH, &db);
+  CLASS* impl;
+  CLASS::Open(options, "/dev/shm/screedb", &impl);
 
   LOG("Inserting " << COUNT << " values");
-  testPut(db);
+  testPut(impl);
   LOG("Getting " << COUNT << " values");
-  testGet(db);
+  testGet(impl);
   LOG("Updating " << COUNT << " values");
-  testPut(db);
+  testPut(impl);
   LOG("Deleting " << COUNT << " values");
-  testDelete(db);
+  testDelete(impl);
   LOG("Reinserting " << COUNT << " values");
-  testPut(db);
+  testPut(impl);
 
-  LOG("Closing database");
-  delete db;
-  LOG("Finished successfully");
+  LOG("Closing");
+  delete impl;
+  LOG("Finished");
   return 0;
 }

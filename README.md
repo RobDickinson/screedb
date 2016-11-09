@@ -29,7 +29,8 @@ New files added:
 -	utilities/screedb/screedb.h (class header)
 -	utilities/screedb/screedb.cc (class implementation)
 -	utilities/screedb/screedb_example.cc (small example adapted from simple_example)
--	utilities/screedb/screedb_stress.cc (stress tests using large dataset)
+-	utilities/screedb/screedb_stress_rocks.cc (stress tests using RocksDB API)
+-	utilities/screedb/screedb_stress_tree.cc (stress tests using persistent tree API)
 -	utilities/screedb/screedb_test.cc (unit tests using Google C++ Testing Framework)
 
 <a name="installation"/>

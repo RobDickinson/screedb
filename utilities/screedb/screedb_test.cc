@@ -82,7 +82,7 @@ TEST_F(ScreeDBTest, SizeofTest) {
 
   // volatile types
   ASSERT_TRUE(sizeof(ScreeDBInnerNode) == 232);
-  ASSERT_TRUE(sizeof(ScreeDBLeafNode) == 40);
+  ASSERT_TRUE(sizeof(ScreeDBLeafNode) == 88);
 }
 
 TEST_F(ScreeDBTest, DeleteAllTest) {

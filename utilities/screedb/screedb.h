@@ -98,6 +98,7 @@ struct ScreeDBInnerNode : ScreeDBNode {                    // volatile inner nod
 };
 
 struct ScreeDBLeafNode : ScreeDBNode {                     // volatile leaf nodes of the tree
+  uint8_t hashes[NODE_KEYS];                               // Pearson hashes of keys
   persistent_ptr<ScreeDBLeaf> leaf;                        // pointer to persistent leaf
   bool lock;                                               // boolean modification lock
 };
@@ -116,11 +117,11 @@ public:
 protected:
   void LeafDebugDump(ScreeDBNode* node);
   void LeafDebugDumpWithChildren(ScreeDBInnerNode* inner);
-  void LeafFillFirstEmptySlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+  void LeafFillFirstEmptySlot(ScreeDBLeafNode* leafnode, const uint8_t hash,
                               const Slice& key, const Slice& value);
-  bool LeafFillSlotForKey(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+  bool LeafFillSlotForKey(ScreeDBLeafNode* leafnode, const uint8_t hash,
                           const Slice& key, const Slice& value);
-  void LeafFillSpecificSlot(const persistent_ptr<ScreeDBLeaf> leaf, const uint8_t hash,
+  void LeafFillSpecificSlot(ScreeDBLeafNode* leafnode, const uint8_t hash,
                             const Slice& key, const Slice& value, const int slot);
   ScreeDBLeafNode* LeafSearch(const Slice& key);
   void LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,

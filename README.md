@@ -113,7 +113,7 @@ Beyond providing a clean-room implementation, the design of ScreeDB differs from
 
 1. ScreeDB has the goal of RocksDB interoperability, and so its implementation heavily relies on the RocksDB API and its primitive types (like Slice). FPTree does not target RocksDB compatibility.
 
-2. FPTree does not specify a hash method implementation, where ScreeDB uses a modified Pearson hash (from RFC 3074).
+2. FPTree does not specify a hash method implementation, where ScreeDB uses a Pearson hash (RFC 3074).
 
 3. Within its persistent leaves, FPTree uses an array of key hashes with a separate visibility bitmap to track what hash slots are occupied. ScreeDB takes a different approach and uses only an array of key hashes (no bitmaps).  ScreeDB relies on a specially modified Pearson hash function, where a hash value of zero always indicates the slot is unused by convention. This optimization eliminates the cost of using and maintaining visibility bitmaps as well as cramming more hashes into a single cache-line, and affects the implementation of every primitive operation in the tree.
 

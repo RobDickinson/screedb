@@ -67,10 +67,7 @@ void testGet(ScreeDBTree* impl) {
 
 void testPut(ScreeDBTree* impl) {
   auto started = current_millis();
-  for (int i = 0; i < COUNT; i++) {
-    std::string str = std::to_string(i)/* + LOREM_IPSUM_120*/;
-    impl->Put(str, str);
-  }
+  for (int i = 0; i < COUNT; i++) impl->Put(std::to_string(i), std::to_string(i) + LOREM_IPSUM_120);
   LOG("   in " << current_millis() - started << " ms");
 }
 

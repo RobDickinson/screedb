@@ -500,12 +500,7 @@ void ScreeDBString::set(const Slice& slice) {
     pmemobj_tx_add_range_direct(sso, SSO_SIZE);                          // add sso buffer to txn
     strcpy(sso, slice.data_);                                            // copy slice data
   } else {                                                               // setting long value?
-    if (str) {                                                           // value already present?
-      size_t str_len = strlen(str.get());                                // calculate string size
-      if (str_len != slice.size_) {                                      // does size differ?
-        delete_persistent<char[]>(str, str_len);                         // free value pmem
-      }
-    }
+    if (str) delete_persistent<char[]>(str, strlen(str.get()));          // free value if present
     str = make_persistent<char[]>(slice.size_ + 1);                      // allocate value pmem
     strcpy(str.get(), slice.data_);                                      // copy slice data
   }

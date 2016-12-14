@@ -61,7 +61,7 @@ namespace screedb {
 #define NODE_KEYS 48                                       // maximum keys in tree nodes
 #define NODE_KEYS_MIDPOINT 24                              // halfway point within the node
 #define SSO_CHARS 15                                       // chars for short string optimization
-#define SSO_SIZE 16                                        // sso chars plus null terminator
+#define SSO_SIZE (SSO_CHARS + 1)                           // sso chars plus null terminator
 
 class ScreeDBString {                                      // persistent string class
 public:                                                    // start public fields and methods

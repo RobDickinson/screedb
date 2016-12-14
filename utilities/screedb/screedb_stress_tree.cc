@@ -40,7 +40,11 @@
 
 using namespace rocksdb::screedb;
 
-const unsigned long COUNT = 30000000;
+const unsigned long COUNT = 3100000;
+
+const char* LOREM_IPSUM_120 = " Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer non vestibulum lectus. Suspendisse metus leo volutpa.";
+const char* LOREM_IPSUM_248 = " Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut vulputate neque egestas, hendrerit nibh in, tristique urna. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec non orci mattis, cursus nisl eu, aliquam felis. Ut euismod ame.";
+const char* LOREM_IPSUM_504 = " Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam et varius velit, in venenatis augue. Mauris volutpat consectetur suscipit. Nam velit sem, consectetur quis euismod id, ornare non turpis. Curabitur tempor ut turpis vitae tincidunt. Praesent malesuada dapibus congue. Nullam eu sollicitudin ex, eget ullamcorper massa. Phasellus feugiat dictum augue ac molestie. Cras non augue lacinia, laoreet elit eleifend, maximus sapien. Proin gravida congue neque, in tempor sem euismod ut. Nullami.";
 
 unsigned long current_millis() {
   struct timeval tv;
@@ -64,7 +68,7 @@ void testGet(ScreeDBTree* impl) {
 void testPut(ScreeDBTree* impl) {
   auto started = current_millis();
   for (int i = 0; i < COUNT; i++) {
-    std::string str = std::to_string(i);
+    std::string str = std::to_string(i)/* + LOREM_IPSUM_120*/;
     impl->Put(str, str);
   }
   LOG("   in " << current_millis() - started << " ms");

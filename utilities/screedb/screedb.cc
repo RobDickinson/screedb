@@ -319,12 +319,16 @@ void ScreeDBTree::LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
     for (int slot = NODE_KEYS; slot--;) {
       const char* slot_key = leaf->kv_keys[slot].get_ro().data();
       if (strcmp(slot_key, split_key.data()) > 0) {
+        new_leaf->kv_keys[slot].get_rw() = slot_key;  // todo use copy-vs-swap here too
         new_leafnode->hashes[slot] = leafnode->hashes[slot];
         new_leaf->hashes[slot] = leafnode->hashes[slot];
         leafnode->hashes[slot] = 0;
         leaf->hashes[slot] = 0;
-        new_leaf->kv_keys[slot].get_rw() = slot_key;
-        new_leaf->kv_values[slot].get_rw() = leaf->kv_values[slot].get_ro().data();
+        if (strlen(leaf->kv_values[slot].get_ro().data()) <= SSO_CHARS) {
+          new_leaf->kv_values[slot].get_rw() = leaf->kv_values[slot].get_ro().data();
+        } else {
+          new_leaf->kv_values[slot].swap(leaf->kv_values[slot]);
+        }
       }
     }
     auto target = strcmp(key.data_, split_key.data()) > 0 ? new_leafnode : leafnode;

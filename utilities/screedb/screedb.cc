@@ -493,13 +493,13 @@ char* ScreeDBString::data() const {
 void ScreeDBString::set(const Slice& slice) {
   if (slice.size_ <= SSO_CHARS) {                                        // setting short value?
     if (str) {                                                           // value already present?
-      delete_persistent<char[]>(str, strlen(str.get()));                 // free value memory
+      delete_persistent<char[]>(str, strlen(str.get()) + 1);             // free value memory
       str = nullptr;                                                     // zero out pointer
     }
     pmemobj_tx_add_range_direct(sso, SSO_SIZE);                          // add sso buffer to txn
     strcpy(sso, slice.data_);                                            // copy slice data
   } else {                                                               // setting long value?
-    if (str) delete_persistent<char[]>(str, strlen(str.get()));          // free value if present
+    if (str) delete_persistent<char[]>(str, strlen(str.get()) + 1);      // free value if present
     str = make_persistent<char[]>(slice.size_ + 1);                      // allocate value pmem
     strcpy(str.get(), slice.data_);                                      // copy slice data
   }

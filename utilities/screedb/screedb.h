@@ -66,7 +66,8 @@ namespace screedb {
 class ScreeDBString {                                      // persistent string class
 public:                                                    // start public fields and methods
   char* data() const;                                      // returns data as c-style string
-  void set(const Slice& slice);                            // copy data from c-style string
+  bool is_short() const { return !str; }                   // returns true for short strings
+  void set(const Slice& slice);                            // copy data from slice
 private:                                                   // start private fields and methods
   char sso[SSO_SIZE];                                      // local storage for short strings
   persistent_ptr<char[]> str;                              // pointer to storage for longer strings

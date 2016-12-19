@@ -264,10 +264,10 @@ bool ScreeDBTree::LeafFillSlotForKey(ScreeDBLeafNode* leafnode, const uint8_t ha
 void ScreeDBTree::LeafFillSpecificSlot(ScreeDBLeafNode* leafnode, const uint8_t hash,
                                        const Slice& key, const Slice& value, const int slot) {
   auto leaf = leafnode->leaf;
-  if (leafnode->hashes[slot] == 0) leaf->kv_keys[slot].get_rw() = key.data_;
+  if (leafnode->hashes[slot] == 0) leaf->kv_keys[slot].get_rw().set(key.data_);
   leafnode->hashes[slot] = hash;
   leaf->hashes[slot] = hash;
-  leaf->kv_values[slot].get_rw() = value.data_;
+  leaf->kv_values[slot].get_rw().set(value.data_);
 }
 
 ScreeDBLeafNode* ScreeDBTree::LeafSearch(const Slice& key) {
@@ -319,13 +319,13 @@ void ScreeDBTree::LeafSplit(ScreeDBLeafNode* leafnode, const uint8_t hash,
     for (int slot = NODE_KEYS; slot--;) {
       const char* slot_key = leaf->kv_keys[slot].get_ro().data();
       if (strcmp(slot_key, split_key.data()) > 0) {
-        new_leaf->kv_keys[slot].get_rw() = slot_key;  // todo use copy-vs-swap here too
+        new_leaf->kv_keys[slot].get_rw().set(slot_key);  // todo use copy-vs-swap here too
         new_leafnode->hashes[slot] = leafnode->hashes[slot];
         new_leaf->hashes[slot] = leafnode->hashes[slot];
         leafnode->hashes[slot] = 0;
         leaf->hashes[slot] = 0;
         if (strlen(leaf->kv_values[slot].get_ro().data()) <= SSO_CHARS) {
-          new_leaf->kv_values[slot].get_rw() = leaf->kv_values[slot].get_ro().data();
+          new_leaf->kv_values[slot].get_rw().set(leaf->kv_values[slot].get_ro().data());
         } else {
           new_leaf->kv_values[slot].swap(leaf->kv_values[slot]);
         }
@@ -485,11 +485,6 @@ uint8_t ScreeDBTree::PearsonHash(const char* data, const size_t size) {
 // ===============================================================================================
 // STRING CLASS METHODS
 // ===============================================================================================
-
-ScreeDBString& ScreeDBString::operator=(const Slice& slice) {
-  set(slice);                                                            // aliased to set method
-  return *this;                                                          // return current instance
-}
 
 char* ScreeDBString::data() const {
   return str ? str.get() : const_cast<char*>(sso);                       // return short or long

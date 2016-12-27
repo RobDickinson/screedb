@@ -336,17 +336,17 @@ TEST_F(ScreeDBTest, UpdateAfterRecoveryTest) {
 }
 
 // =============================================================================================
-// TEST MULTIPLE-LEAF TREE (ONE INNER NODE ONLY)
+// TEST MULTIPLE-LEAF TREE WITH SINGLE INNER NODE
 // =============================================================================================
 
 TEST_F(ScreeDBTest, MultipleLeafNodeAscendingTest) {
-  for (int i = 10000; i <= (10000 + NODE_KEYS * 8); i++) {
+  for (int i = 10000; i <= (10000 + NODE_KEYS * (INNER_KEYS - 1)); i++) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, istr).ok());
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
-  for (int i = 10000; i <= (10000 + NODE_KEYS * 8); i++) {
+  for (int i = 10000; i <= (10000 + NODE_KEYS * (INNER_KEYS - 1)); i++) {
     std::string istr = std::to_string(i);
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
@@ -354,13 +354,13 @@ TEST_F(ScreeDBTest, MultipleLeafNodeAscendingTest) {
 }
 
 TEST_F(ScreeDBTest, MultipleLeafNodeAscendingTest2) {
-  for (int i = 1; i <= NODE_KEYS * 8; i++) {
+  for (int i = 1; i <= NODE_KEYS * (INNER_KEYS - 1); i++) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, istr).ok());
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
-  for (int i = 1; i <= NODE_KEYS * 8; i++) {
+  for (int i = 1; i <= NODE_KEYS * (INNER_KEYS - 1); i++) {
     std::string istr = std::to_string(i);
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
@@ -368,13 +368,13 @@ TEST_F(ScreeDBTest, MultipleLeafNodeAscendingTest2) {
 }
 
 TEST_F(ScreeDBTest, MultipleLeafNodeDescendingTest) {
-  for (int i = (10000 + NODE_KEYS * 8); i >= 10000; i--) {
+  for (int i = (10000 + NODE_KEYS * (INNER_KEYS - 1)); i >= 10000; i--) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, istr).ok());
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
-  for (int i = (10000 + NODE_KEYS * 8); i >= 10000; i--) {
+  for (int i = (10000 + NODE_KEYS * (INNER_KEYS - 1)); i >= 10000; i--) {
     std::string istr = std::to_string(i);
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
@@ -382,23 +382,21 @@ TEST_F(ScreeDBTest, MultipleLeafNodeDescendingTest) {
 }
 
 TEST_F(ScreeDBTest, MultipleLeafNodeDescendingTest2) {
-  for (int i = NODE_KEYS * 8; i >= 1; i--) {
+  for (int i = NODE_KEYS * (INNER_KEYS - 1); i >= 1; i--) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, istr).ok());
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
-  for (int i = NODE_KEYS * 8; i >= 1; i--) {
+  for (int i = NODE_KEYS * (INNER_KEYS - 1); i >= 1; i--) {
     std::string istr = std::to_string(i);
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
 }
 
-// todo need delete tests for multiple leaves
-
 // =============================================================================================
-// TEST RECOVERY OF MULTIPLE-LEAF TREE (ONE INNER NODE ONLY)
+// TEST RECOVERY OF MULTIPLE-LEAF TREE WITH SINGLE INNER NODE
 // =============================================================================================
 
 // todo not yet recovering inner nodes

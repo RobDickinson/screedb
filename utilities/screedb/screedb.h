@@ -103,6 +103,11 @@ struct ScreeDBLeafNode : ScreeDBNode {                     // volatile leaf node
   bool lock;                                               // boolean modification lock
 };
 
+struct ScreeDBRecoveredLeaf {                              // temporary wrapper used for recovery
+  ScreeDBLeafNode* leafnode;                               // leaf node being recovered
+  char* max_key;                                           // highest sorting key present
+};
+
 class ScreeDBTree {                                        // persistent tree implementation
 public:
   ScreeDBTree(const std::string& name);

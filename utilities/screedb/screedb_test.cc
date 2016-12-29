@@ -401,7 +401,57 @@ TEST_F(ScreeDBTest, SingleInnerNodeDescendingTest2) {
 // TEST RECOVERY OF TREE WITH SINGLE INNER NODE
 // =============================================================================================
 
-// todo not yet recovering inner nodes
+TEST_F(ScreeDBTest, SingleInnerNodeAscendingAfterRecoveryTest) {
+  for (int i = 10000; i <= (10000 + SINGLE_INNER_LIMIT); i++) {
+    std::string istr = std::to_string(i);
+    assert(db->Put(WriteOptions(), istr, istr).ok());
+  }
+  Reopen();
+  for (int i = 10000; i <= (10000 + SINGLE_INNER_LIMIT); i++) {
+    std::string istr = std::to_string(i);
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
+  }
+}
+
+TEST_F(ScreeDBTest, SingleInnerNodeAscendingAfterRecoveryTest2) {
+  for (int i = 1; i <= SINGLE_INNER_LIMIT; i++) {
+    std::string istr = std::to_string(i);
+    assert(db->Put(WriteOptions(), istr, istr).ok());
+  }
+  Reopen();
+  for (int i = 1; i <= SINGLE_INNER_LIMIT; i++) {
+    std::string istr = std::to_string(i);
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
+  }
+}
+
+TEST_F(ScreeDBTest, SingleInnerNodeDescendingAfterRecoveryTest) {
+  for (int i = (10000 + SINGLE_INNER_LIMIT); i >= 10000; i--) {
+    std::string istr = std::to_string(i);
+    assert(db->Put(WriteOptions(), istr, istr).ok());
+  }
+  Reopen();
+  for (int i = (10000 + SINGLE_INNER_LIMIT); i >= 10000; i--) {
+    std::string istr = std::to_string(i);
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
+  }
+}
+
+TEST_F(ScreeDBTest, SingleInnerNodeDescendingAfterRecoveryTest2) {
+  for (int i = SINGLE_INNER_LIMIT; i >= 1; i--) {
+    std::string istr = std::to_string(i);
+    assert(db->Put(WriteOptions(), istr, istr).ok());
+  }
+  Reopen();
+  for (int i = SINGLE_INNER_LIMIT; i >= 1; i--) {
+    std::string istr = std::to_string(i);
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
+  }
+}
 
 // =============================================================================================
 // TEST LARGE TREE
@@ -437,10 +487,32 @@ TEST_F(ScreeDBTest, LargeDescendingTest) {
   }
 }
 
-// todo need delete tests for nested inner nodes
-
 // =============================================================================================
-// TEST RECOVERY OF NESTED-INNER TREE
+// TEST RECOVERY OF LARGE TREE
 // =============================================================================================
 
-// todo not yet recovering inner nodes
+TEST_F(ScreeDBTest, LargeAscendingAfterRecoveryTest) {
+  for (int i = 1; i <= LARGE_LIMIT; i++) {
+    std::string istr = std::to_string(i);
+    assert(db->Put(WriteOptions(), istr, (istr + "!")).ok());
+  }
+  Reopen();
+  for (int i = 1; i <= LARGE_LIMIT; i++) {
+    std::string istr = std::to_string(i);
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == (istr + "!"));
+  }
+}
+
+TEST_F(ScreeDBTest, LargeDescendingAfterRecoveryTest) {
+  for (int i = LARGE_LIMIT; i >= 1; i--) {
+    std::string istr = std::to_string(i);
+    assert(db->Put(WriteOptions(), istr, ("ABC" + istr)).ok());
+  }
+  Reopen();
+  for (int i = LARGE_LIMIT; i >= 1; i--) {
+    std::string istr = std::to_string(i);
+    std::string value;
+    assert(db->Get(ReadOptions(), istr, &value).ok() && value == ("ABC" + istr));
+  }
+}

@@ -41,6 +41,7 @@
 using namespace rocksdb::screedb;
 
 const unsigned long COUNT = 3100000;
+const std::string PATH = "/dev/shm/screedb";
 
 const char* LOREM_IPSUM_120 = " Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer non vestibulum lectus. Suspendisse metus leo volutpa.";
 const char* LOREM_IPSUM_248 = " Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut vulputate neque egestas, hendrerit nibh in, tristique urna. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec non orci mattis, cursus nisl eu, aliquam felis. Ut euismod ame.";
@@ -50,6 +51,13 @@ unsigned long current_millis() {
   struct timeval tv;
   gettimeofday(&tv, NULL);
   return (unsigned long long) (tv.tv_sec) * 1000 + (unsigned long long) (tv.tv_usec) / 1000;
+}
+
+ScreeDBTree* open() {
+  auto started = current_millis();
+  auto impl = new ScreeDBTree(PATH);
+  LOG("   in " << current_millis() - started << " ms");
+  return impl;
 }
 
 void testDelete(ScreeDBTree* impl) {
@@ -72,11 +80,16 @@ void testPut(ScreeDBTree* impl) {
 }
 
 int main() {
-  LOG("Opening");
-  ScreeDBTree* impl = new ScreeDBTree("/dev/shm/screedb");
-
+  LOG("\nRecovering tree");
+  ScreeDBTree* impl = open();
   LOG("Inserting " << COUNT << " values");
   testPut(impl);
+  LOG("Getting " << COUNT << " values");
+  testGet(impl);
+  delete impl;
+
+  LOG("\nRecovering tree");
+  impl = open();
   LOG("Getting " << COUNT << " values");
   testGet(impl);
   LOG("Updating " << COUNT << " values");
@@ -85,9 +98,8 @@ int main() {
   testDelete(impl);
   LOG("Reinserting " << COUNT << " values");
   testPut(impl);
-
-  LOG("Closing");
   delete impl;
-  LOG("Finished");
+
+  LOG("\nFinished");
   return 0;
 }

@@ -39,6 +39,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <algorithm>
+#include <list>
 #include "screedb.h"
 
 #define DO_LOG 0
@@ -403,7 +404,7 @@ void ScreeDBTree::Recover() {
     });
   } else {
     LOG("   recovering head: opened=" << root->opened << ", closed=" << root->closed);
-    // @todo handle opened/closed inequality, including count correction
+    // todo handle opened/closed inequality, including count correction
     RebuildNodes();
     transaction::exec_tx(pop_, [&] { root->opened = root->opened + 1; });
   }
@@ -413,25 +414,55 @@ void ScreeDBTree::Recover() {
 void ScreeDBTree::RebuildNodes() {
   LOG("   rebuilding nodes");
 
-  // traverse persistent leaves to build volatile leaf nodes
-  ScreeDBLeafNode* first_leafnode = nullptr;
+  // traverse persistent leaves to build list of leaves to recover
+  std::list<ScreeDBRecoveredLeaf*> leaves;
   auto leaf = pop_.get_root()->head;
-  while (true) {  // todo unbounded loop
-    ScreeDBLeafNode* leafnode = new ScreeDBLeafNode();
+  while (leaf != nullptr) {
+    auto leafnode = new ScreeDBLeafNode();
     leafnode->leaf = leaf;
     leafnode->is_leaf = true;
-    for (int slot = NODE_KEYS; slot--;) leafnode->hashes[slot] = leaf->hashes[slot];
-    if (first_leafnode == nullptr) first_leafnode = leafnode;
-    if (leaf->next) {
-      leaf = leaf->next;
-    } else {
-      break;
+
+    // find highest sorting key in leaf, while recovering all hashes
+    char* max_key = nullptr;
+    for (int slot = NODE_KEYS; slot--;) {
+      leafnode->hashes[slot] = leaf->hashes[slot];
+      if (leafnode->hashes[slot] == 0) continue;
+      char* key = leaf->kv_keys[slot].get_ro().data();
+      if (max_key == nullptr || strcmp(max_key, key) < 0) max_key = key;
     }
+
+    // use highest sorting key to decide how to recover the leaf
+    if (max_key == nullptr) {
+      // todo squelch until decided on handling empty leaf node (part of GC?)
+    } else {
+      auto rleaf = new ScreeDBRecoveredLeaf;
+      rleaf->leafnode = leafnode;
+      rleaf->max_key = max_key;
+      leaves.push_back(rleaf);
+    }
+
+    leaf = leaf->next ? leaf->next : nullptr;  // advance to next linked leaf
   }
 
-  // build inner nodes and initialize top pointer
-  {
-    top_ = first_leafnode;  // todo should be the topmost inner node
+  // sort recovered leaves in ascending key order
+  leaves.sort([](const ScreeDBRecoveredLeaf* lhs, const ScreeDBRecoveredLeaf* rhs) {
+    return (strcmp(lhs->max_key, rhs->max_key) < 0);
+  });
+
+  // reconstruct top/inner nodes using adjacent pairs of recovered leaves
+  top_ = nullptr;
+  while (!leaves.empty()) {
+    ScreeDBRecoveredLeaf* rleaf = leaves.front();
+    ScreeDBLeafNode* leafnode = rleaf->leafnode;
+    if (top_ == nullptr) top_ = leafnode;
+    leaves.pop_front();
+    if (!leaves.empty()) {
+      std::string split_key = std::string(rleaf->max_key);
+      ScreeDBLeafNode* nextnode = leaves.front()->leafnode;
+      nextnode->parent = leafnode->parent;
+      LeafUpdateParentsAfterSplit(leafnode, nextnode, &split_key);
+    }
+    delete rleaf;
   }
 
   LOG("   rebuilt nodes ok");

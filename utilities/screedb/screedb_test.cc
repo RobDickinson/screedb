@@ -336,59 +336,61 @@ TEST_F(ScreeDBTest, UpdateAfterRecoveryTest) {
 }
 
 // =============================================================================================
-// TEST MULTIPLE-LEAF TREE WITH SINGLE INNER NODE
+// TEST TREE WITH SINGLE INNER NODE
 // =============================================================================================
 
-TEST_F(ScreeDBTest, MultipleLeafNodeAscendingTest) {
-  for (int i = 10000; i <= (10000 + NODE_KEYS * (INNER_KEYS - 1)); i++) {
+const int SINGLE_INNER_LIMIT = NODE_KEYS * (INNER_KEYS - 1);
+
+TEST_F(ScreeDBTest, SingleInnerNodeAscendingTest) {
+  for (int i = 10000; i <= (10000 + SINGLE_INNER_LIMIT); i++) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, istr).ok());
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
-  for (int i = 10000; i <= (10000 + NODE_KEYS * (INNER_KEYS - 1)); i++) {
+  for (int i = 10000; i <= (10000 + SINGLE_INNER_LIMIT); i++) {
     std::string istr = std::to_string(i);
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
 }
 
-TEST_F(ScreeDBTest, MultipleLeafNodeAscendingTest2) {
-  for (int i = 1; i <= NODE_KEYS * (INNER_KEYS - 1); i++) {
+TEST_F(ScreeDBTest, SingleInnerNodeAscendingTest2) {
+  for (int i = 1; i <= SINGLE_INNER_LIMIT; i++) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, istr).ok());
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
-  for (int i = 1; i <= NODE_KEYS * (INNER_KEYS - 1); i++) {
+  for (int i = 1; i <= SINGLE_INNER_LIMIT; i++) {
     std::string istr = std::to_string(i);
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
 }
 
-TEST_F(ScreeDBTest, MultipleLeafNodeDescendingTest) {
-  for (int i = (10000 + NODE_KEYS * (INNER_KEYS - 1)); i >= 10000; i--) {
+TEST_F(ScreeDBTest, SingleInnerNodeDescendingTest) {
+  for (int i = (10000 + SINGLE_INNER_LIMIT); i >= 10000; i--) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, istr).ok());
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
-  for (int i = (10000 + NODE_KEYS * (INNER_KEYS - 1)); i >= 10000; i--) {
+  for (int i = (10000 + SINGLE_INNER_LIMIT); i >= 10000; i--) {
     std::string istr = std::to_string(i);
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
 }
 
-TEST_F(ScreeDBTest, MultipleLeafNodeDescendingTest2) {
-  for (int i = NODE_KEYS * (INNER_KEYS - 1); i >= 1; i--) {
+TEST_F(ScreeDBTest, SingleInnerNodeDescendingTest2) {
+  for (int i = SINGLE_INNER_LIMIT; i >= 1; i--) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, istr).ok());
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
   }
-  for (int i = NODE_KEYS * (INNER_KEYS - 1); i >= 1; i--) {
+  for (int i = SINGLE_INNER_LIMIT; i >= 1; i--) {
     std::string istr = std::to_string(i);
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == istr);
@@ -396,37 +398,39 @@ TEST_F(ScreeDBTest, MultipleLeafNodeDescendingTest2) {
 }
 
 // =============================================================================================
-// TEST RECOVERY OF MULTIPLE-LEAF TREE WITH SINGLE INNER NODE
+// TEST RECOVERY OF TREE WITH SINGLE INNER NODE
 // =============================================================================================
 
 // todo not yet recovering inner nodes
 
 // =============================================================================================
-// TEST NESTED-INNER TREE
+// TEST LARGE TREE
 // =============================================================================================
 
-TEST_F(ScreeDBTest, NestedInnerNodeAscendingTest) {
-  for (int i = 1; i <= 999999; i++) {
+const int LARGE_LIMIT = 1000000;
+
+TEST_F(ScreeDBTest, LargeAscendingTest) {
+  for (int i = 1; i <= LARGE_LIMIT; i++) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, (istr + "!")).ok());
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == (istr + "!"));
   }
-  for (int i = 1; i <= 999999; i++) {
+  for (int i = 1; i <= LARGE_LIMIT; i++) {
     std::string istr = std::to_string(i);
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == (istr + "!"));
   }
 }
 
-TEST_F(ScreeDBTest, NestedInnerNodeDescendingTest) {
-  for (int i = 999999; i >= 1; i--) {
+TEST_F(ScreeDBTest, LargeDescendingTest) {
+  for (int i = LARGE_LIMIT; i >= 1; i--) {
     std::string istr = std::to_string(i);
     assert(db->Put(WriteOptions(), istr, ("ABC" + istr)).ok());
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == ("ABC" + istr));
   }
-  for (int i = 999999; i >= 1; i--) {
+  for (int i = LARGE_LIMIT; i >= 1; i--) {
     std::string istr = std::to_string(i);
     std::string value;
     assert(db->Get(ReadOptions(), istr, &value).ok() && value == ("ABC" + istr));

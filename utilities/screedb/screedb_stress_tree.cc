@@ -68,8 +68,10 @@ void testDelete(ScreeDBTree* impl) {
 
 void testGet(ScreeDBTree* impl) {
   auto started = current_millis();
-  std::string value;
-  for (int i = 0; i < COUNT; i++) { impl->Get(std::to_string(i), &value); }
+  for (int i = 0; i < COUNT; i++) {
+    std::string value;
+    impl->Get(std::to_string(i), &value);
+  }
   LOG("   in " << current_millis() - started << " ms");
 }
 

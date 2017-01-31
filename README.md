@@ -7,6 +7,10 @@ ScreeDB is a RocksDB utility that bypasses the RocksDB LSM implementation entire
 
 As a utility, ScreeDB does not modify the core RocksDB distribution, but only adds code at expected extension points. The structure of extensions for ScreeDB takes inspiration from existing SpatialDB and TransactionDB utilities, which provide high-level wrappers using the RocksDB API.
 
+*This project is no longer being maintained, instead refer to [pmemkv](https://github.com/RobDickinson/pmemkv). This
+is experimental pre-release software and should not be used in production systems. This has known memory leaks and
+other issues that we don't intend to ever fix.*
+
 Contents
 --------
 

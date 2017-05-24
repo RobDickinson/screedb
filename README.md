@@ -7,9 +7,7 @@ ScreeDB is a RocksDB utility that bypasses the RocksDB LSM implementation entire
 
 As a utility, ScreeDB does not modify the core RocksDB distribution, but only adds code at expected extension points. The structure of extensions for ScreeDB takes inspiration from existing SpatialDB and TransactionDB utilities, which provide high-level wrappers using the RocksDB API.
 
-*This project is no longer being maintained, instead refer to [pmemkv](https://github.com/RobDickinson/pmemkv). This
-is experimental pre-release software and should not be used in production systems. This has known memory leaks and
-other issues that we don't intend to ever fix.*
+**WARNING: This project is no longer being maintained, please refer to [pmemkv](https://github.com/RobDickinson/pmemkv). This is experimental pre-release software and should not be used in production systems. This has known memory leaks and other issues that we don't intend to ever fix.**
 
 Contents
 --------
@@ -130,14 +128,3 @@ Beyond providing a clean-room implementation, the design of ScreeDB differs from
 **cpp_map**
 
 Use of NVML C++ bindings by ScreeDB was lifted from this example program. Many thanks to Tomasz Kapela for providing a great example to follow!
-
-**KV/NVM pathfinding**
-
-This research explores LSM optimizations in the context of an internal RocksDB fork.
-
-```
-Sign up on gerrit server at http://az-sg-sw01.ch.intel.com/gerrit
-**Warning!** HTTP proxy may need to be disabled on Ubuntu to connect to gerrit web UI
-
-git clone -b dev/kv_pathfinding ssh://az-sg-sw01.ch.intel.com:29418/rocksdb rocksdb.kv
-```
